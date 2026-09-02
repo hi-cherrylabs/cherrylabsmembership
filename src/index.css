@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* Enables class-based dark mode (toggling .dark on <html>) instead of
+   Tailwind v4's default prefers-color-scheme-only behavior. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer utilities {
+  @keyframes gridDraw {
+    0% {
+      mask-position: 200% 200%;
+      -webkit-mask-position: 200% 200%;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      mask-position: -100% -100%;
+      -webkit-mask-position: -100% -100%;
+      opacity: 0;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Theme tokens. Every "frosted glass" surface, border, and text color in */
+/* the app reads from these instead of hardcoded Tailwind white/black     */
+/* utilities, so the whole UI - not just a couple of screens - responds   */
+/* to the light/dark toggle. Dark-mode glass intentionally stays a LOW-   */
+/* opacity white tint (rather than switching to a light tint) so it       */
+/* reads as genuine frosted dark glass sitting on a dark backdrop.        */
+/* ---------------------------------------------------------------------- */
+:root {
+  --bg-page: #ffffff;
+  --grid-line: rgba(0, 0, 0, 0.3);
+
+  --text-100: #000000;
+  --text-90: rgba(0, 0, 0, 0.9);
+  --text-85: rgba(0, 0, 0, 0.85);
+  --text-80: rgba(0, 0, 0, 0.8);
+  --text-70: rgba(0, 0, 0, 0.7);
+  --text-60: rgba(0, 0, 0, 0.6);
+  --text-50: rgba(0, 0, 0, 0.5);
+  --text-40: rgba(0, 0, 0, 0.4);
+  --text-30: rgba(0, 0, 0, 0.3);
+
+  --surface-10: rgba(255, 255, 255, 0.1);
+  --surface-20: rgba(255, 255, 255, 0.2);
+  --surface-25: rgba(255, 255, 255, 0.25);
+  --surface-30: rgba(255, 255, 255, 0.3);
+  --surface-40: rgba(255, 255, 255, 0.4);
+  --surface-50: rgba(255, 255, 255, 0.5);
+  --surface-55: rgba(255, 255, 255, 0.55);
+  --surface-60: rgba(255, 255, 255, 0.6);
+  --surface-65: rgba(255, 255, 255, 0.65);
+  --surface-70: rgba(255, 255, 255, 0.7);
+  --surface-80: rgba(255, 255, 255, 0.8);
+  --surface-90: rgba(255, 255, 255, 0.9);
+
+  --border-10: rgba(255, 255, 255, 0.1);
+  --border-15: rgba(255, 255, 255, 0.15);
+  --border-20: rgba(255, 255, 255, 0.2);
+  --border-50: rgba(255, 255, 255, 0.5);
+  --border-60: rgba(255, 255, 255, 0.6);
+  --border-70: rgba(255, 255, 255, 0.7);
+  --border-80: rgba(255, 255, 255, 0.8);
+
+  --border-black-10: rgba(0, 0, 0, 0.1);
+
+  --invert-bg: #000000;
+  --invert-text: #ffffff;
+}
+
+.dark {
+  --bg-page: #0a0a0a;
+  --grid-line: rgba(255, 255, 255, 0.3);
+
+  --text-100: #ffffff;
+  --text-90: rgba(255, 255, 255, 0.92);
+  --text-85: rgba(255, 255, 255, 0.88);
+  --text-80: rgba(255, 255, 255, 0.85);
+  --text-70: rgba(255, 255, 255, 0.78);
+  --text-60: rgba(255, 255, 255, 0.7);
+  --text-50: rgba(255, 255, 255, 0.6);
+  --text-40: rgba(255, 255, 255, 0.5);
+  --text-30: rgba(255, 255, 255, 0.4);
+
+  --surface-10: rgba(255, 255, 255, 0.05);
+  --surface-20: rgba(255, 255, 255, 0.06);
+  --surface-25: rgba(255, 255, 255, 0.07);
+  --surface-30: rgba(255, 255, 255, 0.08);
+  --surface-40: rgba(255, 255, 255, 0.08);
+  --surface-50: rgba(255, 255, 255, 0.1);
+  --surface-55: rgba(255, 255, 255, 0.1);
+  --surface-60: rgba(255, 255, 255, 0.11);
+  --surface-65: rgba(255, 255, 255, 0.12);
+  --surface-70: rgba(255, 255, 255, 0.13);
+  --surface-80: rgba(255, 255, 255, 0.15);
+  --surface-90: rgba(255, 255, 255, 0.18);
+
+  --border-10: rgba(255, 255, 255, 0.08);
+  --border-15: rgba(255, 255, 255, 0.1);
+  --border-20: rgba(255, 255, 255, 0.12);
+  --border-50: rgba(255, 255, 255, 0.14);
+  --border-60: rgba(255, 255, 255, 0.16);
+  --border-70: rgba(255, 255, 255, 0.18);
+  --border-80: rgba(255, 255, 255, 0.2);
+
+  --border-black-10: rgba(255, 255, 255, 0.12);
+
+  --invert-bg: #ffffff;
+  --invert-text: #000000;
+}
+
+body {
+  background-color: var(--bg-page);
+  transition: background-color 0.3s ease;
+}
+
+/* Circular-reveal theme toggle (native View Transitions API). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
