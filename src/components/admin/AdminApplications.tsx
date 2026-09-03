@@ -11,7 +11,7 @@ const STATUS_STYLES: Record<ApplicationStatus, string> = {
   rejected: 'bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300',
 };
 
-function ApplicationCard({ app }: { app: Application }) {
+function ApplicationCard({ app }: { app: Application; key?: string }) {
   const [note, setNote] = useState(app.adminNote);
   const [savingNote, setSavingNote] = useState(false);
 

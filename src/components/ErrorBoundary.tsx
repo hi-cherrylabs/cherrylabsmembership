@@ -1,5 +1,4 @@
-import { Component } from 'react';
-import type { ReactNode } from 'react';
+import { Component, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -10,7 +9,10 @@ interface State {
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+  constructor(props: Props) {
+    super(props);
+    (this as any).state = { hasError: false };
+  }
 
   static getDerivedStateFromError() {
     return { hasError: true };
@@ -22,9 +24,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.hasError) {
+    if ((this as any).state?.hasError) {
       return (
-        <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-white px-8 text-center">
+        <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-[var(--bg-page)] px-8 text-center">
           <h1 className="text-2xl font-black text-[var(--text-90)]">Something went wrong</h1>
           <p className="text-sm font-semibold text-[var(--text-50)] max-w-sm">
             This screen hit an unexpected error. Try reloading — if it keeps happening, let us know via the suggestions inbox.
@@ -38,6 +40,6 @@ export default class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return this.props.children;
+    return (this as any).props.children;
   }
 }

@@ -66,6 +66,7 @@ export default function DashboardMain({
 }: {
   posts: Post[];
   onNavigate: (view: DashboardSubView) => void;
+  key?: string;
 }) {
   const dashboardScrollRef = useRef<HTMLDivElement>(null);
   const carouselMeasureRef = useRef<HTMLDivElement>(null);
@@ -101,19 +102,18 @@ export default function DashboardMain({
   }, [displaySlides.length, carouselIndex]);
 
   // Drives the collapse: as the options list scrolls, the carousel zooms
-  // out & fades away, and the space it reserved (the spacer below) shrinks
-  // so the options rise up to sit right below the hamburger button. Since
-  // this reads directly from scroll position (not scroll direction), it
-  // reverses smoothly when the user scrolls back up to the top.
+  // out & fades away completely, and the space it reserved (the spacer below)
+  // shrinks so the options rise up to sit cleanly right below the header clearance.
   const { scrollY } = useScroll({ container: dashboardScrollRef });
   const collapseRange = Math.max(carouselHeight, 1);
-  const carouselScale = useTransform(scrollY, [0, collapseRange], [1, 0.85]);
+  const carouselScale = useTransform(scrollY, [0, collapseRange * 0.8], [1, 0.75]);
   const carouselOpacity = useTransform(scrollY, [0, collapseRange * 0.65], [1, 0]);
-  const carouselTranslateY = useTransform(scrollY, [0, collapseRange], [0, -28]);
+  const carouselTranslateY = useTransform(scrollY, [0, collapseRange], [0, -32]);
+  const carouselVisibility = useTransform(scrollY, (latest) => (latest >= collapseRange * 0.65 ? 'hidden' : 'visible'));
   const spacerHeight = useTransform(scrollY, [0, collapseRange], [carouselHeight + CAROUSEL_GAP, 0]);
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
-    const shouldBeInteractive = latest < collapseRange * 0.5;
+    const shouldBeInteractive = latest < collapseRange * 0.4;
     setCarouselInteractive((prev) => (prev === shouldBeInteractive ? prev : shouldBeInteractive));
   });
 
@@ -126,20 +126,20 @@ export default function DashboardMain({
       transition={{ duration: 0.5 }}
       className="relative z-20 w-full h-full"
     >
-      {/* Fixed, scroll-collapsing announcement carousel - stays pinned in
-          place (does not scroll away) but zooms out and fades as the
-          options list below is scrolled, then zooms back in when scrolled
-          back to the top. */}
+      {/* Fixed, scroll-collapsing announcement carousel - zooms out and fades
+          to complete hidden state as the options list is scrolled, then zooms
+          back in when scrolled back to the top. */}
       <motion.div
         ref={carouselMeasureRef}
         style={{
           scale: carouselScale,
           opacity: carouselOpacity,
           y: carouselTranslateY,
+          visibility: carouselVisibility,
           pointerEvents: carouselInteractive ? 'auto' : 'none',
           top: `${HEADER_CLEARANCE}px`,
         }}
-        className="fixed left-0 right-0 z-30 w-full max-w-5xl mx-auto px-4 sm:px-8"
+        className="fixed left-0 right-0 z-30 w-full max-w-5xl mx-auto px-4 sm:px-8 transition-visibility duration-200"
       >
         <div className="relative group">
           <motion.div

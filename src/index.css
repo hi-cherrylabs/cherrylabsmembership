@@ -76,7 +76,7 @@
 
 .dark {
   --bg-page: #0a0a0a;
-  --grid-line: rgba(255, 255, 255, 0.3);
+  --grid-line: rgba(255, 255, 255, 0.2);
 
   --text-100: #ffffff;
   --text-90: rgba(255, 255, 255, 0.92);
@@ -88,28 +88,28 @@
   --text-40: rgba(255, 255, 255, 0.5);
   --text-30: rgba(255, 255, 255, 0.4);
 
-  --surface-10: rgba(255, 255, 255, 0.05);
-  --surface-20: rgba(255, 255, 255, 0.06);
-  --surface-25: rgba(255, 255, 255, 0.07);
-  --surface-30: rgba(255, 255, 255, 0.08);
-  --surface-40: rgba(255, 255, 255, 0.08);
-  --surface-50: rgba(255, 255, 255, 0.1);
-  --surface-55: rgba(255, 255, 255, 0.1);
-  --surface-60: rgba(255, 255, 255, 0.11);
-  --surface-65: rgba(255, 255, 255, 0.12);
-  --surface-70: rgba(255, 255, 255, 0.13);
-  --surface-80: rgba(255, 255, 255, 0.15);
-  --surface-90: rgba(255, 255, 255, 0.18);
+  --surface-10: rgba(20, 20, 28, 0.45);
+  --surface-20: rgba(22, 22, 32, 0.52);
+  --surface-25: rgba(24, 24, 36, 0.58);
+  --surface-30: rgba(26, 26, 40, 0.62);
+  --surface-40: rgba(28, 28, 44, 0.68);
+  --surface-50: rgba(30, 30, 48, 0.72);
+  --surface-55: rgba(32, 32, 52, 0.76);
+  --surface-60: rgba(35, 35, 56, 0.80);
+  --surface-65: rgba(38, 38, 60, 0.84);
+  --surface-70: rgba(40, 40, 64, 0.88);
+  --surface-80: rgba(45, 45, 72, 0.92);
+  --surface-90: rgba(50, 50, 80, 0.95);
 
   --border-10: rgba(255, 255, 255, 0.08);
   --border-15: rgba(255, 255, 255, 0.1);
   --border-20: rgba(255, 255, 255, 0.12);
-  --border-50: rgba(255, 255, 255, 0.14);
-  --border-60: rgba(255, 255, 255, 0.16);
-  --border-70: rgba(255, 255, 255, 0.18);
-  --border-80: rgba(255, 255, 255, 0.2);
+  --border-50: rgba(255, 255, 255, 0.16);
+  --border-60: rgba(255, 255, 255, 0.2);
+  --border-70: rgba(255, 255, 255, 0.24);
+  --border-80: rgba(255, 255, 255, 0.28);
 
-  --border-black-10: rgba(255, 255, 255, 0.12);
+  --border-black-10: rgba(255, 255, 255, 0.14);
 
   --invert-bg: #ffffff;
   --invert-text: #000000;

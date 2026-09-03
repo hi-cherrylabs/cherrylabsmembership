@@ -13,8 +13,9 @@ function PostForm({
 }: {
   initial: typeof emptyForm;
   onCancel?: () => void;
-  onSubmit: (data: typeof emptyForm) => void;
+  onSubmit: (data: typeof emptyForm) => void | Promise<void>;
   submitLabel: string;
+  key?: string;
 }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
