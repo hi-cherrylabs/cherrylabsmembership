@@ -66,11 +66,11 @@ export default function App() {
   useEffect(() => {
     if (authLoading) { setScreen('loading'); return; }
     if (!user) { setScreen('signin'); setDashboardView('main'); return; }
-    if (profileLoading || !profile) { setScreen('loading'); return; }
-    if (profile.banned) { setScreen('banned'); return; }
+    if (profileLoading && !profile) { setScreen('loading'); return; }
+    if (profile?.banned) { setScreen('banned'); return; }
 
     setScreen((prev) => {
-      if (profile.onboarded) {
+      if (profile?.onboarded) {
         if (prev === 'signin' || prev === 'loading' || prev === 'banned') return 'dashboard';
         return prev;
       }

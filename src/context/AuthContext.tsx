@@ -58,31 +58,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isAdminUser = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       setProfileLoading(true);
+      const defaultCountry = COUNTRIES[0];
+      const fallbackProfile: UserProfile = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Member',
+        gender: '',
+        countryCode: defaultCountry.code,
+        countryName: defaultCountry.name,
+        countryFlag: defaultCountry.flag,
+        phoneNumber: '',
+        isTanzanian: null,
+        region: '',
+        onboarded: false,
+        banned: false,
+        isAdmin: isAdminUser,
+        adminType: isAdminUser ? 'super' : undefined,
+        createdAt: null,
+        vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
+      };
+
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const existing = await getDoc(userRef);
 
         if (!existing.exists()) {
-          const defaultCountry = COUNTRIES[0];
           const newProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: firebaseUser.displayName || '',
-            gender: '',
-            countryCode: defaultCountry.code,
-            countryName: defaultCountry.name,
-            countryFlag: defaultCountry.flag,
-            phoneNumber: '',
-            isTanzanian: null,
-            region: '',
-            onboarded: false,
-            banned: false,
-            isAdmin: isAdminUser,
-            adminType: isAdminUser ? 'super' : undefined,
+            ...fallbackProfile,
             createdAt: serverTimestamp(),
-            vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
           };
           await setDoc(userRef, newProfile);
+          setProfile(fallbackProfile);
+        } else {
+          setProfile(existing.data() as UserProfile);
         }
 
         // Live-subscribe so admin edits (VIP extension, ban, etc.) reflect immediately.
@@ -91,17 +99,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (snap) => {
             if (snap.exists()) {
               setProfile(snap.data() as UserProfile);
+            } else {
+              setProfile((prev) => prev || fallbackProfile);
             }
             setProfileLoading(false);
           },
           (err) => {
             console.error('Error listening to profile snapshot:', err);
+            setProfile((prev) => prev || fallbackProfile);
             setProfileLoading(false);
           }
         );
         unsubProfileRef.current = unsubProfile;
       } catch (err) {
         console.error('Error initializing user profile:', err);
+        setProfile(fallbackProfile);
         setProfileLoading(false);
       }
     });
