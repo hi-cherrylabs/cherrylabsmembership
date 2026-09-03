@@ -71,9 +71,21 @@ export default function App() {
 
     setScreen((prev) => {
       if (profile?.onboarded) {
-        if (prev === 'signin' || prev === 'loading' || prev === 'banned') return 'dashboard';
-        return prev;
+        if (
+          prev === 'onboard_saving' ||
+          prev === 'onboard_success' ||
+          prev === 'onboard_start' ||
+          prev === 'onboard_name' ||
+          prev === 'onboard_gender' ||
+          prev === 'onboard_phone' ||
+          prev === 'onboard_nationality' ||
+          prev === 'onboard_region'
+        ) {
+          return prev;
+        }
+        return 'dashboard';
       }
+
       if (prev === 'signin' || prev === 'loading') return 'reading';
       return prev;
     });
@@ -170,11 +182,19 @@ export default function App() {
   // Finalize onboarding once the member reaches the "saving" step.
   useEffect(() => {
     if (screen !== 'onboard_saving' || !user) return;
+    let timer: ReturnType<typeof setTimeout>;
     (async () => {
-      await updateProfileFields(user.uid, { onboarded: true });
+      try {
+        await updateProfileFields(user.uid, { onboarded: true });
+      } catch (err) {
+        console.error('Failed to update onboarded status:', err);
+      }
       setScreen('onboard_success');
-      setTimeout(() => setScreen('onboard_start'), 3000);
+      timer = setTimeout(() => setScreen('onboard_start'), 2800);
     })();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [screen, user]);
 
   /* -------------------------------- Dashboard -------------------------------- */
