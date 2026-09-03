@@ -43,7 +43,7 @@ type Screen =
   | 'dashboard';
 
 export default function App() {
-  const { user, profile, isAdmin, authLoading, profileLoading, logout } = useAuth();
+  const { user, profile, isAdmin, authLoading, profileHydrated, logout } = useAuth();
 
   const [screen, setScreen] = useState<Screen>('loading');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -75,7 +75,10 @@ export default function App() {
       setDashboardView('main');
       return;
     }
-    if (profileLoading && !profile) { setScreen('loading'); return; }
+    // Wait for the first real Firestore snapshot before making routing decisions.
+    // This prevents an already-onboarded user from briefly seeing the reading
+    // screen because the local fallback profile has onboarded:false.
+    if (!profileHydrated) { setScreen('loading'); return; }
     if (profile?.banned) { setScreen('banned'); return; }
 
     // If an onboarding animation is actively running, do NOT override screen.
@@ -90,7 +93,7 @@ export default function App() {
       if (prev === 'signin' || prev === 'loading') return 'reading';
       return prev;
     });
-  }, [authLoading, user, profileLoading, profile]);
+  }, [authLoading, user, profileHydrated, profile]);
 
   /* ------------------------------ Reading view ------------------------------ */
   const [isAutoScrolling] = useState(true);

@@ -10,7 +10,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { ADMIN_EMAIL, VIP_DURATION_MS, COUNTRIES } from '../lib/constants';
 import type { UserProfile } from '../types';
@@ -21,7 +21,10 @@ interface AuthContextValue {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   authLoading: boolean;
-  profileLoading: boolean;
+  // True once the first real Firestore snapshot has resolved.
+  // The app must NOT make routing decisions until this is true
+  // (prevents flashing onboarding for already-onboarded users).
+  profileHydrated: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithAppleStub: () => Promise<never>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -35,15 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(true);
+  // Stays false until the first Firestore snapshot returns (success or error).
+  // While false the routing effect shows the loading spinner.
+  const [profileHydrated, setProfileHydrated] = useState(false);
   const unsubProfileRef = useRef<() => void>();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
 
-      // Clean up any previous profile listener when auth state changes
+      // Clean up any previous profile listener when auth state changes.
       if (unsubProfileRef.current) {
         unsubProfileRef.current();
         unsubProfileRef.current = undefined;
@@ -51,14 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!firebaseUser) {
         setProfile(null);
-        setProfileLoading(false);
+        setProfileHydrated(true); // No user = nothing to load, release the gate.
         return;
       }
 
       const isAdminUser = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-      setProfileLoading(true);
       const defaultCountry = COUNTRIES[0];
+
+      // Reset hydration gate for this new auth session.
+      setProfileHydrated(false);
+
       const fallbackProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -78,29 +85,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
       };
 
-      // Set fallback profile immediately so the UI is NEVER blocked waiting for network
-      setProfile(fallbackProfile);
-      setProfileLoading(false);
-
-      // Listen to Firestore profile document in real-time
       const userRef = doc(db, 'users', firebaseUser.uid);
+
       const unsubProfile = onSnapshot(
         userRef,
         (snap) => {
           if (snap.exists()) {
+            // Real Firestore data — includes the correct `onboarded` flag.
             setProfile(snap.data() as UserProfile);
           } else {
-            // New user profile creation in Firestore (non-blocking background async write)
+            // Brand new user — write the profile doc and use the fallback locally.
+            setProfile(fallbackProfile);
             setDoc(userRef, {
               ...fallbackProfile,
               createdAt: serverTimestamp(),
             }).catch((err) => {
-              console.error('Error creating user profile document in Firestore:', err);
+              console.error('Error creating user profile in Firestore:', err);
             });
           }
+          // Release the gate AFTER we have real data (or after we know the doc
+          // doesn't exist yet). This prevents the routing effect from ever
+          // sending an already-onboarded user back to the reading screen.
+          setProfileHydrated(true);
         },
         (err) => {
           console.error('Error listening to profile snapshot:', err);
+          // On error, fall back to the local profile so the app is not
+          // stuck on the loading spinner forever.
+          setProfile(fallbackProfile);
+          setProfileHydrated(true);
         }
       );
       unsubProfileRef.current = unsubProfile;
@@ -137,8 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isSuperAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  
-  // Secondary admin check: profile.isAdmin is true AND (not timebound OR expiration has not passed)
+
+  // Secondary admin: profile.isAdmin true AND (no expiry OR not yet expired)
   const isSecondaryAdmin =
     !!profile?.isAdmin &&
     (!profile.adminExpiresAt || profile.adminExpiresAt.toMillis() > Date.now());
@@ -153,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSuperAdmin,
         authLoading,
-        profileLoading,
+        profileHydrated,
         signInWithGoogle,
         signInWithAppleStub,
         signUpWithEmail,
