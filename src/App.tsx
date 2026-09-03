@@ -49,6 +49,10 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // Tracks whether onboarding animation is actively running.
+  // While true, the profile-change routing effect must not override the screen.
+  const onboardingInFlightRef = useRef(false);
+  const onboardTransitionTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const showToast = (message: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -65,27 +69,24 @@ export default function App() {
   // "Admin Panel" entry that shows up in their hamburger menu.
   useEffect(() => {
     if (authLoading) { setScreen('loading'); return; }
-    if (!user) { setScreen('signin'); setDashboardView('main'); return; }
+    if (!user) {
+      onboardingInFlightRef.current = false;
+      setScreen('signin');
+      setDashboardView('main');
+      return;
+    }
     if (profileLoading && !profile) { setScreen('loading'); return; }
     if (profile?.banned) { setScreen('banned'); return; }
 
-    setScreen((prev) => {
-      if (profile?.onboarded) {
-        if (
-          prev === 'onboard_saving' ||
-          prev === 'onboard_success' ||
-          prev === 'onboard_start' ||
-          prev === 'onboard_name' ||
-          prev === 'onboard_gender' ||
-          prev === 'onboard_phone' ||
-          prev === 'onboard_nationality' ||
-          prev === 'onboard_region'
-        ) {
-          return prev;
-        }
-        return 'dashboard';
-      }
+    // If an onboarding animation is actively running, do NOT override screen.
+    if (onboardingInFlightRef.current) return;
 
+    if (profile?.onboarded) {
+      setScreen('dashboard');
+      return;
+    }
+
+    setScreen((prev) => {
       if (prev === 'signin' || prev === 'loading') return 'reading';
       return prev;
     });
@@ -182,19 +183,28 @@ export default function App() {
   // Finalize onboarding once the member reaches the "saving" step.
   useEffect(() => {
     if (screen !== 'onboard_saving' || !user) return;
-    let timer: ReturnType<typeof setTimeout>;
+
+    // Lock the routing effect out so that when profile.onboarded flips to true
+    // the routing effect doesn't jump straight to 'dashboard' mid-animation.
+    onboardingInFlightRef.current = true;
+
     (async () => {
       try {
         await updateProfileFields(user.uid, { onboarded: true });
       } catch (err) {
         console.error('Failed to update onboarded status:', err);
       }
+
       setScreen('onboard_success');
-      timer = setTimeout(() => setScreen('onboard_start'), 2800);
+
+      // Use the module-level ref so the cleanup of THIS effect can never
+      // accidentally cancel the timer when screen changes to 'onboard_success'.
+      if (onboardTransitionTimerRef.current) clearTimeout(onboardTransitionTimerRef.current);
+      onboardTransitionTimerRef.current = setTimeout(() => {
+        setScreen('onboard_start');
+      }, 2800);
     })();
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    // NO cleanup return – we must NOT cancel the timer when screen changes.
   }, [screen, user]);
 
   /* -------------------------------- Dashboard -------------------------------- */
@@ -754,7 +764,15 @@ export default function App() {
             className="relative z-20 flex flex-col items-center justify-center h-[50vh]"
           >
             <button
-              onClick={() => setScreen('dashboard')}
+              onClick={() => {
+                // Release the onboarding lock before navigating so the routing
+                // effect is free to handle future profile changes normally.
+                onboardingInFlightRef.current = false;
+                if (onboardTransitionTimerRef.current) {
+                  clearTimeout(onboardTransitionTimerRef.current);
+                }
+                setScreen('dashboard');
+              }}
               className="px-14 py-5 bg-[var(--invert-bg)] text-[var(--invert-text)] rounded-full font-extrabold text-lg hover:scale-105 active:scale-95 transition-transform shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
             >
               Start
