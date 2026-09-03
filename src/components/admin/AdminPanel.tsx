@@ -10,6 +10,7 @@ import {
   Briefcase,
   Newspaper,
   Settings,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   subscribeAllMembers,
@@ -19,6 +20,7 @@ import {
   subscribeCommunityMessages,
 } from '../../lib/data';
 import type { UserProfile, SuggestionThread, Application, Post, CommunityMessage } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import AdminOverview from './AdminOverview';
 import AdminMembers from './AdminMembers';
 import AdminSuggestions from './AdminSuggestions';
@@ -26,10 +28,11 @@ import AdminChatModeration from './AdminChatModeration';
 import AdminApplications from './AdminApplications';
 import AdminPosts from './AdminPosts';
 import AdminSettings from './AdminSettings';
+import AdminAdmins from './AdminAdmins';
 
-type Tab = 'overview' | 'members' | 'suggestions' | 'moderation' | 'applications' | 'posts' | 'settings';
+type Tab = 'overview' | 'members' | 'suggestions' | 'moderation' | 'applications' | 'posts' | 'settings' | 'admins';
 
-const TABS: { id: Tab; label: string; desc: string; icon: any }[] = [
+const BASE_TABS: { id: Tab; label: string; desc: string; icon: any }[] = [
   { id: 'overview', label: 'Overview', desc: 'Members, VIP passes & activity at a glance', icon: LayoutGrid },
   { id: 'members', label: 'Members', desc: 'Search, ban & manage VIP status', icon: Users },
   { id: 'suggestions', label: 'Suggestions', desc: 'Reply to member suggestion threads', icon: MessageSquare },
@@ -39,7 +42,15 @@ const TABS: { id: Tab; label: string; desc: string; icon: any }[] = [
   { id: 'settings', label: 'Settings', desc: 'Admin account & benefits copy', icon: Settings },
 ];
 
+const SUPER_ADMIN_TAB: { id: Tab; label: string; desc: string; icon: any } = {
+  id: 'admins',
+  label: 'Manage Admins',
+  desc: 'Grant & revoke admin access via tokens',
+  icon: ShieldCheck,
+};
+
 export default function AdminPanel({ onBack }: { onBack: () => void }) {
+  const { isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [threads, setThreads] = useState<SuggestionThread[]>([]);
@@ -57,6 +68,9 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
+
+  // Super admin gets the "Manage Admins" tab prepended after Settings
+  const TABS = isSuperAdmin ? [...BASE_TABS, SUPER_ADMIN_TAB] : BASE_TABS;
 
   const unreadCount = threads.filter((t) => t.unreadByAdmin).length;
   const activeTabMeta = TABS.find((t) => t.id === activeTab);
@@ -100,19 +114,27 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  className="flex items-center justify-between p-4 bg-[var(--surface-25)] hover:bg-[var(--surface-55)] backdrop-blur-xl border border-[var(--border-50)] hover:border-[var(--border-80)] rounded-2xl transition-all duration-200 w-full text-left group shadow-[0_4px_16px_rgba(0,0,0,0.03)] active:scale-[0.98]"
+                  className={`flex items-center justify-between p-4 backdrop-blur-xl border rounded-2xl transition-all duration-200 w-full text-left group shadow-[0_4px_16px_rgba(0,0,0,0.03)] active:scale-[0.98] ${
+                    t.id === 'admins'
+                      ? 'bg-gradient-to-r from-pink-50 to-violet-50 border-pink-200 hover:border-violet-300 hover:from-pink-100 hover:to-violet-100'
+                      : 'bg-[var(--surface-25)] hover:bg-[var(--surface-55)] border-[var(--border-50)] hover:border-[var(--border-80)]'
+                  }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-[var(--surface-60)] flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:bg-[var(--invert-bg)] group-hover:text-[var(--invert-text)] transition-all shrink-0 relative">
-                      <t.icon className="text-[var(--text-100)] group-hover:text-[var(--invert-text)] transition-colors" size={22} strokeWidth={2.5} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:bg-[var(--invert-bg)] group-hover:text-[var(--invert-text)] transition-all shrink-0 relative ${
+                      t.id === 'admins'
+                        ? 'bg-gradient-to-br from-pink-500 to-violet-600 text-white'
+                        : 'bg-[var(--surface-60)]'
+                    }`}>
+                      <t.icon className={`transition-colors ${t.id === 'admins' ? 'text-white group-hover:text-[var(--invert-text)]' : 'text-[var(--text-100)] group-hover:text-[var(--invert-text)]'}`} size={22} strokeWidth={2.5} />
                       {t.id === 'suggestions' && unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-pink-500 text-[var(--invert-text)] text-[9px] font-bold flex items-center justify-center border-2 border-white">
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">
                           {unreadCount}
                         </span>
                       )}
                     </div>
                     <div>
-                      <p className="text-[var(--text-100)] font-extrabold text-[15px]">{t.label}</p>
+                      <p className={`font-extrabold text-[15px] ${t.id === 'admins' ? 'bg-gradient-to-r from-pink-600 to-violet-600 bg-clip-text text-transparent' : 'text-[var(--text-100)]'}`}>{t.label}</p>
                       <p className="text-[var(--text-50)] font-semibold text-xs">{t.desc}</p>
                     </div>
                   </div>
@@ -136,6 +158,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               {activeTab === 'applications' && <AdminApplications applications={applications} />}
               {activeTab === 'posts' && <AdminPosts posts={posts} />}
               {activeTab === 'settings' && <AdminSettings />}
+              {activeTab === 'admins' && isSuperAdmin && <AdminAdmins />}
             </motion.div>
           )}
         </AnimatePresence>

@@ -19,6 +19,7 @@ interface AuthContextValue {
   user: User | null;
   profile: UserProfile | null;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   authLoading: boolean;
   profileLoading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           onboarded: false,
           banned: false,
           isAdmin: isAdminUser,
+          adminType: isAdminUser ? 'super' : undefined,
           createdAt: serverTimestamp(),
           vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
         };
@@ -103,8 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(auth, provider);
   };
 
-  // Apple Sign-In needs a separate Apple Developer setup (Services ID,
-  // private key, verified return domain) that isn't configured yet.
   const signInWithAppleStub = async (): Promise<never> => {
     throw new Error('Sign in with Apple isn\u2019t available yet. Please try Google or Email instead.');
   };
@@ -124,7 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
-  const isAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isSuperAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  
+  // Secondary admin check: profile.isAdmin is true AND (not timebound OR expiration has not passed)
+  const isSecondaryAdmin =
+    !!profile?.isAdmin &&
+    (!profile.adminExpiresAt || profile.adminExpiresAt.toMillis() > Date.now());
+
+  const isAdmin = isSuperAdmin || isSecondaryAdmin;
 
   return (
     <AuthContext.Provider
@@ -132,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         isAdmin,
+        isSuperAdmin,
         authLoading,
         profileLoading,
         signInWithGoogle,

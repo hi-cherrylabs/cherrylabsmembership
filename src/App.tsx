@@ -415,7 +415,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] tracking-tight">What is your name?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">What is your name?</h2>
             <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
               <input
                 autoFocus
@@ -455,7 +455,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] tracking-tight mb-2">What gender are you?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight mb-2">What gender are you?</h2>
             <div className="flex flex-col gap-3">
               {['Male', 'Female', 'Bisexual', 'Rather not to say'].map((gender) => (
                 <button
@@ -483,7 +483,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] tracking-tight">Enter your phone number</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Enter your phone number</h2>
 
             <div className="relative">
               <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
@@ -598,7 +598,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] tracking-tight">Are you a Tanzanian?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Are you a Tanzanian?</h2>
             <div className="flex gap-4">
               <button
                 onClick={() => {
@@ -631,7 +631,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] tracking-tight">Place of residency</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Place of residency</h2>
 
             <div className="relative">
               <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
