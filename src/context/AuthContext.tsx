@@ -58,40 +58,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isAdminUser = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
       setProfileLoading(true);
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const existing = await getDoc(userRef);
+      try {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const existing = await getDoc(userRef);
 
-      if (!existing.exists()) {
-        const defaultCountry = COUNTRIES[0];
-        const newProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || '',
-          gender: '',
-          countryCode: defaultCountry.code,
-          countryName: defaultCountry.name,
-          countryFlag: defaultCountry.flag,
-          phoneNumber: '',
-          isTanzanian: null,
-          region: '',
-          onboarded: false,
-          banned: false,
-          isAdmin: isAdminUser,
-          adminType: isAdminUser ? 'super' : undefined,
-          createdAt: serverTimestamp(),
-          vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
-        };
-        await setDoc(userRef, newProfile);
-      }
-
-      // Live-subscribe so admin edits (VIP extension, ban, etc.) reflect immediately.
-      const unsubProfile = onSnapshot(userRef, (snap) => {
-        if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
+        if (!existing.exists()) {
+          const defaultCountry = COUNTRIES[0];
+          const newProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || '',
+            gender: '',
+            countryCode: defaultCountry.code,
+            countryName: defaultCountry.name,
+            countryFlag: defaultCountry.flag,
+            phoneNumber: '',
+            isTanzanian: null,
+            region: '',
+            onboarded: false,
+            banned: false,
+            isAdmin: isAdminUser,
+            adminType: isAdminUser ? 'super' : undefined,
+            createdAt: serverTimestamp(),
+            vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
+          };
+          await setDoc(userRef, newProfile);
         }
+
+        // Live-subscribe so admin edits (VIP extension, ban, etc.) reflect immediately.
+        const unsubProfile = onSnapshot(
+          userRef,
+          (snap) => {
+            if (snap.exists()) {
+              setProfile(snap.data() as UserProfile);
+            }
+            setProfileLoading(false);
+          },
+          (err) => {
+            console.error('Error listening to profile snapshot:', err);
+            setProfileLoading(false);
+          }
+        );
+        unsubProfileRef.current = unsubProfile;
+      } catch (err) {
+        console.error('Error initializing user profile:', err);
         setProfileLoading(false);
-      });
-      unsubProfileRef.current = unsubProfile;
+      }
     });
 
     return () => {
