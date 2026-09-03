@@ -9,7 +9,7 @@ import {
 
 import { useAuth } from './context/AuthContext';
 import { MiniLoader } from './components/Shared';
-import { COUNTRIES, TANZANIA_REGIONS, READING_PARAGRAPHS_FALLBACK } from './lib/constants';
+import { COUNTRIES, TANZANIA_REGIONS } from './lib/constants';
 import type { Country } from './lib/constants';
 import { updateProfileFields, subscribeBenefitParagraphs, subscribePosts } from './lib/data';
 import type { BenefitParagraph } from './lib/data';
@@ -43,16 +43,12 @@ type Screen =
   | 'dashboard';
 
 export default function App() {
-  const { user, profile, isAdmin, authLoading, profileHydrated, logout } = useAuth();
+  const { user, profile, isAdmin, authLoading, profileLoading, logout } = useAuth();
 
   const [screen, setScreen] = useState<Screen>('loading');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  // Tracks whether onboarding animation is actively running.
-  // While true, the profile-change routing effect must not override the screen.
-  const onboardingInFlightRef = useRef(false);
-  const onboardTransitionTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const showToast = (message: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -69,31 +65,19 @@ export default function App() {
   // "Admin Panel" entry that shows up in their hamburger menu.
   useEffect(() => {
     if (authLoading) { setScreen('loading'); return; }
-    if (!user) {
-      onboardingInFlightRef.current = false;
-      setScreen('signin');
-      setDashboardView('main');
-      return;
-    }
-    // Wait for the first real Firestore snapshot before making routing decisions.
-    // This prevents an already-onboarded user from briefly seeing the reading
-    // screen because the local fallback profile has onboarded:false.
-    if (!profileHydrated) { setScreen('loading'); return; }
-    if (profile?.banned) { setScreen('banned'); return; }
-
-    // If an onboarding animation is actively running, do NOT override screen.
-    if (onboardingInFlightRef.current) return;
-
-    if (profile?.onboarded) {
-      setScreen('dashboard');
-      return;
-    }
+    if (!user) { setScreen('signin'); setDashboardView('main'); return; }
+    if (profileLoading || !profile) { setScreen('loading'); return; }
+    if (profile.banned) { setScreen('banned'); return; }
 
     setScreen((prev) => {
+      if (profile.onboarded) {
+        if (prev === 'signin' || prev === 'loading' || prev === 'banned') return 'dashboard';
+        return prev;
+      }
       if (prev === 'signin' || prev === 'loading') return 'reading';
       return prev;
     });
-  }, [authLoading, user, profileHydrated, profile]);
+  }, [authLoading, user, profileLoading, profile]);
 
   /* ------------------------------ Reading view ------------------------------ */
   const [isAutoScrolling] = useState(true);
@@ -102,7 +86,7 @@ export default function App() {
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [benefitParagraphs, setBenefitParagraphs] = useState<BenefitParagraph[]>(READING_PARAGRAPHS_FALLBACK);
+  const [benefitParagraphs, setBenefitParagraphs] = useState<BenefitParagraph[]>([]);
 
   useEffect(() => {
     if (screen !== 'reading') return;
@@ -186,28 +170,11 @@ export default function App() {
   // Finalize onboarding once the member reaches the "saving" step.
   useEffect(() => {
     if (screen !== 'onboard_saving' || !user) return;
-
-    // Lock the routing effect out so that when profile.onboarded flips to true
-    // the routing effect doesn't jump straight to 'dashboard' mid-animation.
-    onboardingInFlightRef.current = true;
-
     (async () => {
-      try {
-        await updateProfileFields(user.uid, { onboarded: true });
-      } catch (err) {
-        console.error('Failed to update onboarded status:', err);
-      }
-
+      await updateProfileFields(user.uid, { onboarded: true });
       setScreen('onboard_success');
-
-      // Use the module-level ref so the cleanup of THIS effect can never
-      // accidentally cancel the timer when screen changes to 'onboard_success'.
-      if (onboardTransitionTimerRef.current) clearTimeout(onboardTransitionTimerRef.current);
-      onboardTransitionTimerRef.current = setTimeout(() => {
-        setScreen('onboard_start');
-      }, 2800);
+      setTimeout(() => setScreen('onboard_start'), 3000);
     })();
-    // NO cleanup return – we must NOT cancel the timer when screen changes.
   }, [screen, user]);
 
   /* -------------------------------- Dashboard -------------------------------- */
@@ -448,7 +415,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">What is your name?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-page)] tracking-tight">What is your name?</h2>
             <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
               <input
                 autoFocus
@@ -488,7 +455,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight mb-2">What gender are you?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-page)] tracking-tight mb-2">What gender are you?</h2>
             <div className="flex flex-col gap-3">
               {['Male', 'Female', 'Bisexual', 'Rather not to say'].map((gender) => (
                 <button
@@ -516,7 +483,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Enter your phone number</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-page)] tracking-tight">Enter your phone number</h2>
 
             <div className="relative">
               <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
@@ -631,7 +598,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Are you a Tanzanian?</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-page)] tracking-tight">Are you a Tanzanian?</h2>
             <div className="flex gap-4">
               <button
                 onClick={() => {
@@ -664,7 +631,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(5px)' }}
             className="relative z-20 flex flex-col items-center gap-6 mt-12"
           >
-            <h2 className="text-[22px] font-bold text-[var(--text-85)] dark:text-white tracking-tight">Place of residency</h2>
+            <h2 className="text-[22px] font-bold text-[var(--text-page)] tracking-tight">Place of residency</h2>
 
             <div className="relative">
               <div className="group relative flex items-center bg-[var(--surface-50)] backdrop-blur-xl border border-[var(--border-70)] rounded-full p-2 hover:bg-[var(--invert-bg)] focus-within:bg-[var(--invert-bg)] transition-colors duration-150 shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
@@ -767,15 +734,7 @@ export default function App() {
             className="relative z-20 flex flex-col items-center justify-center h-[50vh]"
           >
             <button
-              onClick={() => {
-                // Release the onboarding lock before navigating so the routing
-                // effect is free to handle future profile changes normally.
-                onboardingInFlightRef.current = false;
-                if (onboardTransitionTimerRef.current) {
-                  clearTimeout(onboardTransitionTimerRef.current);
-                }
-                setScreen('dashboard');
-              }}
+              onClick={() => setScreen('dashboard')}
               className="px-14 py-5 bg-[var(--invert-bg)] text-[var(--invert-text)] rounded-full font-extrabold text-lg hover:scale-105 active:scale-95 transition-transform shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
             >
               Start

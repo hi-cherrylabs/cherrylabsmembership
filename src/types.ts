@@ -14,9 +14,7 @@ export interface UserProfile {
   onboarded: boolean;
   banned: boolean;
   isAdmin: boolean;
-  adminType?: 'super' | 'standard' | 'timebound';
-  adminGrantedBy?: string;
-  adminGrantedAt?: Timestamp | null;
+  adminTokenId?: string | null;
   adminExpiresAt?: Timestamp | null;
   createdAt: Timestamp | null;
   vipExpiresAt: Timestamp | null;
@@ -24,18 +22,17 @@ export interface UserProfile {
 
 export interface AdminToken {
   id: string;
-  tokenCode: string;
-  targetEmail: string;
-  tokenType: 'standard' | 'timebound';
+  token: string;
+  email: string;
+  type: 'standard' | 'time_based';
   durationHours?: number;
-  expiresAt?: Timestamp | null;
+  expiresAt: Timestamp | null;
   used: boolean;
-  usedByUid?: string | null;
-  usedByEmail?: string | null;
-  usedAt?: Timestamp | null;
-  createdByEmail: string;
+  usedByUid: string | null;
+  usedAt: Timestamp | null;
+  status: 'pending' | 'active' | 'expired' | 'revoked';
+  createdBy: string;
   createdAt: Timestamp | null;
-  revoked: boolean;
 }
 
 export interface CommunityMessage {

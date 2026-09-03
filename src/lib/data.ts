@@ -9,7 +9,6 @@ import {
   setDoc,
   onSnapshot,
   query,
-  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -26,7 +25,6 @@ import type {
   ApplicationStatus,
   Post,
   UserProfile,
-  AdminToken,
 } from '../types';
 import { READING_PARAGRAPHS_FALLBACK } from './constants';
 
@@ -274,128 +272,134 @@ export async function saveBenefitParagraphs(paragraphs: BenefitParagraph[]) {
   await setDoc(doc(db, 'settings', 'content'), { benefitParagraphs: paragraphs }, { merge: true });
 }
 
-/* ----------------------------- Admin Tokens ----------------------------- */
+/* ----------------------------- Admin Tokens ------------------------------- */
 
-/** Generates a random CHERRY-ADM-XXXX-XXXX token code */
-export function generateTokenCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const rand = (n: number) =>
-    Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `CHERRY-ADM-${rand(4)}-${rand(4)}`;
+/** Generates a readable token code e.g. ADM-7K9P-2M4X */
+function generateTokenCode(): string {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 8; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ADM-${rand.slice(0, 4)}-${rand.slice(4)}`;
 }
 
 export async function createAdminToken(
-  createdByEmail: string,
-  targetEmail: string,
-  tokenType: 'standard' | 'timebound',
-  durationHours?: number
-): Promise<string> {
-  const tokenCode = generateTokenCode();
-  const now = Timestamp.now();
-  const expiresAt =
-    tokenType === 'timebound' && durationHours
-      ? Timestamp.fromMillis(Date.now() + durationHours * 3600 * 1000)
-      : null;
+  email: string,
+  type: 'standard' | 'time_based',
+  durationHours: number = 24,
+  createdBy: string = 'hello.cherrylabs@gmail.com'
+) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) throw new Error('Email is required.');
 
-  await addDoc(collection(db, 'admin_tokens'), {
-    tokenCode,
-    targetEmail: targetEmail.toLowerCase().trim(),
-    tokenType,
-    durationHours: durationHours ?? null,
+  const tokenCode = generateTokenCode();
+  const tokenDocRef = doc(collection(db, 'admin_tokens'));
+  const nowMs = Date.now();
+
+  let expiresAt: Timestamp | null = null;
+  if (type === 'time_based') {
+    expiresAt = Timestamp.fromMillis(nowMs + durationHours * 60 * 60 * 1000);
+  }
+
+  const newToken = {
+    token: tokenCode,
+    email: cleanEmail,
+    type,
+    durationHours: type === 'time_based' ? durationHours : undefined,
     expiresAt,
     used: false,
     usedByUid: null,
-    usedByEmail: null,
     usedAt: null,
-    createdByEmail: createdByEmail.toLowerCase(),
-    createdAt: now,
-    revoked: false,
-  });
+    status: 'pending' as const,
+    createdBy,
+    createdAt: serverTimestamp(),
+  };
 
-  return tokenCode;
+  await setDoc(tokenDocRef, newToken);
+  return { id: tokenDocRef.id, ...newToken };
 }
 
-export function subscribeAdminTokens(cb: (tokens: AdminToken[]) => void) {
+export function subscribeAdminTokens(cb: (tokens: any[]) => void) {
   const q = query(collection(db, 'admin_tokens'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AdminToken, 'id'>) })));
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   });
 }
 
-export async function revokeAdminToken(tokenId: string) {
-  await updateDoc(doc(db, 'admin_tokens', tokenId), { revoked: true });
+export async function revokeAdminToken(tokenId: string, targetEmail: string) {
+  const cleanEmail = targetEmail.trim().toLowerCase();
+  await updateDoc(doc(db, 'admin_tokens', tokenId), { status: 'revoked' });
+
+  // Find user by email and revoke admin privileges in users collection
+  const usersSnap = await getDocs(collection(db, 'users'));
+  const targetUserDoc = usersSnap.docs.find((d) => (d.data().email || '').toLowerCase() === cleanEmail);
+  if (targetUserDoc) {
+    await updateDoc(targetUserDoc.ref, {
+      isAdmin: false,
+      adminExpiresAt: null,
+      adminTokenId: null,
+    });
+  }
 }
 
-export async function deleteAdminToken(tokenId: string) {
-  await deleteDoc(doc(db, 'admin_tokens', tokenId));
-}
+export async function verifyAndRedeemAdminToken(
+  enteredToken: string,
+  user: UserProfile
+) {
+  const cleanToken = enteredToken.trim().toUpperCase();
+  if (!cleanToken) throw new Error('Please enter an access token.');
+  if (!user.email) throw new Error('Your account must have a valid email to redeem an admin token.');
 
-/** Called when a user claims a token. Returns error string or null on success. */
-export async function verifyAndRedeemToken(
-  uid: string,
-  userEmail: string,
-  tokenCode: string
-): Promise<null | string> {
-  // Find token matching this code
-  const q = query(
-    collection(db, 'admin_tokens'),
-    where('tokenCode', '==', tokenCode.trim().toUpperCase())
-  );
-  const snap = await getDocs(q);
-  if (snap.empty) return 'Invalid token code. Please check and try again.';
+  const cleanUserEmail = user.email.toLowerCase();
 
-  const tokenDoc = snap.docs[0];
-  const token = { id: tokenDoc.id, ...(tokenDoc.data() as Omit<AdminToken, 'id'>) };
+  // Search admin_tokens collection for matching token code
+  const tokensSnap = await getDocs(collection(db, 'admin_tokens'));
+  const matchingDoc = tokensSnap.docs.find((d) => {
+    const data = d.data();
+    return (data.token || '').trim().toUpperCase() === cleanToken;
+  });
 
-  if (token.revoked) return 'This token has been revoked by the admin.';
-  if (token.used) return 'This access token has already been used and cannot be reused.';
-  if (token.targetEmail !== userEmail.toLowerCase())
-    return 'This token is not authorized for your email address.';
-  if (
-    token.tokenType === 'timebound' &&
-    token.expiresAt &&
-    token.expiresAt.toMillis() < Date.now()
-  )
-    return 'This token has expired. Please request a new one from the admin.';
+  if (!matchingDoc) {
+    throw new Error('Invalid access token code. Please check and try again.');
+  }
 
-  const now = Timestamp.now();
-  const expiresAt =
-    token.tokenType === 'timebound' && token.expiresAt ? token.expiresAt : null;
+  const tokenData = matchingDoc.data();
 
-  // Mark token as used (one-time only)
-  await updateDoc(doc(db, 'admin_tokens', token.id), {
+  if (tokenData.used || tokenData.status === 'active') {
+    throw new Error('This access token has already been redeemed.');
+  }
+
+  if (tokenData.status === 'revoked') {
+    throw new Error('This access token has been revoked by the Super Admin.');
+  }
+
+  if ((tokenData.email || '').toLowerCase() !== cleanUserEmail) {
+    throw new Error(`This token was issued specifically for ${tokenData.email}. Your current email (${cleanUserEmail}) is not authorized for this token.`);
+  }
+
+  if (tokenData.type === 'time_based' && tokenData.expiresAt) {
+    const expMs = typeof tokenData.expiresAt.toMillis === 'function' ? tokenData.expiresAt.toMillis() : 0;
+    if (expMs && expMs <= Date.now()) {
+      await updateDoc(matchingDoc.ref, { status: 'expired' });
+      throw new Error('This access token has expired.');
+    }
+  }
+
+  // Redeem token
+  await updateDoc(matchingDoc.ref, {
     used: true,
-    usedByUid: uid,
-    usedByEmail: userEmail.toLowerCase(),
-    usedAt: now,
+    usedByUid: user.uid,
+    usedAt: serverTimestamp(),
+    status: 'active',
   });
 
-  // Promote user to admin
-  await updateDoc(doc(db, 'users', uid), {
+  // Upgrade user profile
+  await updateDoc(doc(db, 'users', user.uid), {
     isAdmin: true,
-    adminType: token.tokenType === 'standard' ? 'standard' : 'timebound',
-    adminGrantedBy: token.createdByEmail,
-    adminGrantedAt: now,
-    adminExpiresAt: expiresAt,
+    adminTokenId: matchingDoc.id,
+    adminExpiresAt: tokenData.expiresAt || null,
   });
 
-  return null;
+  return { id: matchingDoc.id, ...tokenData };
 }
-
-export function subscribeAdmins(cb: (admins: UserProfile[]) => void) {
-  const q = query(collection(db, 'users'), where('isAdmin', '==', true), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => d.data() as UserProfile));
-  });
-}
-
-export async function revokeAdminAccess(uid: string) {
-  await updateDoc(doc(db, 'users', uid), {
-    isAdmin: false,
-    adminType: null,
-    adminGrantedBy: null,
-    adminGrantedAt: null,
-    adminExpiresAt: null,
-  });
-}
-

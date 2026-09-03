@@ -17,10 +17,11 @@ export const ScrollOption = ({
     offset: ['start 95%', 'start 10%'],
   });
 
-  const scale = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0.92, 1, 1, 0.98]);
+  const scale = useTransform(scrollYProgress, [0, 0.1, 0.9, 1], [0.95, 1, 1, 0.95]);
+  const opacity = useTransform(scrollYProgress, [0, 0.05, 0.95, 1], [0, 1, 1, 1]);
 
   return (
-    <motion.div ref={ref} style={{ scale, opacity: 1 }} className="w-full origin-center">
+    <motion.div ref={ref} style={{ scale, opacity }} className="w-full origin-center">
       {children}
     </motion.div>
   );

@@ -7,61 +7,80 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Permanent super admin check
+    // Super Admin = strictly hello.cherrylabs@gmail.com
     function isSuperAdmin() {
       return isSignedIn() && request.auth.token.email.lower() == 'hello.cherrylabs@gmail.com';
+    }
+
+    // Admin = Super Admin OR user document has isAdmin == true
+    function isAdmin() {
+      return isSuperAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
     }
 
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isNotBanned() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.banned != true;
+    }
+
     /* ------------------------------ Members ------------------------------- */
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isSignedIn();
-      allow delete: if isSuperAdmin();
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /* --------------------------- Admin Tokens ----------------------------- */
+    match /admin_tokens/{id} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /* --------------------------- Community chat ---------------------------- */
     match /community_messages/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && isNotBanned();
       allow update: if false;
-      allow delete: if isSignedIn();
+      allow delete: if isAdmin();
     }
 
     /* ---------------------- Suggestions / support chat ---------------------- */
     match /suggestions/{uid} {
-      allow read, write: if isSignedIn();
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid) || isAdmin();
 
       match /messages/{msgId} {
-        allow read, create, delete: if isSignedIn();
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if (isOwner(uid) && request.resource.data.sender == 'user')
+                      || (isAdmin() && request.resource.data.sender == 'admin');
         allow update: if false;
+        allow delete: if isAdmin();
       }
     }
 
     /* ----------------------------- Applications ------------------------------ */
     match /applications/{id} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /* -------------------- Posts (announcements + what's new) -------------------- */
     match /posts/{id} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     /* --------------------------------- Settings --------------------------------- */
     match /settings/{id} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    /* ----------------------------- Admin Tokens --------------------------------- */
-    match /admin_tokens/{tokenId} {
-      allow read, write: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
