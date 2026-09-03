@@ -9,7 +9,7 @@ import {
 
 import { useAuth } from './context/AuthContext';
 import { MiniLoader } from './components/Shared';
-import { COUNTRIES, TANZANIA_REGIONS } from './lib/constants';
+import { COUNTRIES, TANZANIA_REGIONS, READING_PARAGRAPHS_FALLBACK } from './lib/constants';
 import type { Country } from './lib/constants';
 import { updateProfileFields, subscribeBenefitParagraphs, subscribePosts } from './lib/data';
 import type { BenefitParagraph } from './lib/data';
@@ -86,7 +86,7 @@ export default function App() {
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [benefitParagraphs, setBenefitParagraphs] = useState<BenefitParagraph[]>([]);
+  const [benefitParagraphs, setBenefitParagraphs] = useState<BenefitParagraph[]>(READING_PARAGRAPHS_FALLBACK);
 
   useEffect(() => {
     if (screen !== 'reading') return;

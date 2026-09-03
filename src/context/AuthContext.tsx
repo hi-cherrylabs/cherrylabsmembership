@@ -78,44 +78,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         vipExpiresAt: Timestamp.fromMillis(Date.now() + VIP_DURATION_MS),
       };
 
-      try {
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const existing = await getDoc(userRef);
+      // Set fallback profile immediately so the UI is NEVER blocked waiting for network
+      setProfile(fallbackProfile);
+      setProfileLoading(false);
 
-        if (!existing.exists()) {
-          const newProfile = {
-            ...fallbackProfile,
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(userRef, newProfile);
-          setProfile(fallbackProfile);
-        } else {
-          setProfile(existing.data() as UserProfile);
-        }
-
-        // Live-subscribe so admin edits (VIP extension, ban, etc.) reflect immediately.
-        const unsubProfile = onSnapshot(
-          userRef,
-          (snap) => {
-            if (snap.exists()) {
-              setProfile(snap.data() as UserProfile);
-            } else {
-              setProfile((prev) => prev || fallbackProfile);
-            }
-            setProfileLoading(false);
-          },
-          (err) => {
-            console.error('Error listening to profile snapshot:', err);
-            setProfile((prev) => prev || fallbackProfile);
-            setProfileLoading(false);
+      // Listen to Firestore profile document in real-time
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const unsubProfile = onSnapshot(
+        userRef,
+        (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          } else {
+            // New user profile creation in Firestore (non-blocking background async write)
+            setDoc(userRef, {
+              ...fallbackProfile,
+              createdAt: serverTimestamp(),
+            }).catch((err) => {
+              console.error('Error creating user profile document in Firestore:', err);
+            });
           }
-        );
-        unsubProfileRef.current = unsubProfile;
-      } catch (err) {
-        console.error('Error initializing user profile:', err);
-        setProfile(fallbackProfile);
-        setProfileLoading(false);
-      }
+        },
+        (err) => {
+          console.error('Error listening to profile snapshot:', err);
+        }
+      );
+      unsubProfileRef.current = unsubProfile;
     });
 
     return () => {
