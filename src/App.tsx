@@ -226,7 +226,7 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="absolute top-8 left-8 z-50 flex flex-col items-start gap-5"
           >
-            <h1 className="text-[32px] font-bold tracking-tighter text-[var(--text-85)]">cherrylabs.inc</h1>
+            <h1 className="text-[32px] font-bold tracking-tighter text-[var(--text-85)] dark:text-white">cherrylabs.inc</h1>
 
             <div className="relative">
               <button
