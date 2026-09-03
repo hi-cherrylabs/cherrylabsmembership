@@ -7,8 +7,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin = whoever is signed in with the Cherry Labs Google account.
-    function isAdmin() {
+    // Permanent super admin check
+    function isSuperAdmin() {
       return isSignedIn() && request.auth.token.email.lower() == 'hello.cherrylabs@gmail.com';
     }
 
@@ -16,60 +16,52 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function isNotBanned() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.banned != true;
-    }
-
     /* ------------------------------ Members ------------------------------- */
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
-      allow delete: if isAdmin();
+      allow update: if isSignedIn();
+      allow delete: if isSuperAdmin();
     }
 
     /* --------------------------- Community chat ---------------------------- */
     match /community_messages/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn()
-        && request.resource.data.uid == request.auth.uid
-        && isNotBanned();
+      allow create: if isSignedIn();
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn();
     }
 
     /* ---------------------- Suggestions / support chat ---------------------- */
     match /suggestions/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow write: if isOwner(uid) || isAdmin();
+      allow read, write: if isSignedIn();
 
       match /messages/{msgId} {
-        allow read: if isOwner(uid) || isAdmin();
-        allow create: if (isOwner(uid) && request.resource.data.sender == 'user')
-                      || (isAdmin() && request.resource.data.sender == 'admin');
+        allow read, create, delete: if isSignedIn();
         allow update: if false;
-        allow delete: if isAdmin();
       }
     }
 
     /* ----------------------------- Applications ------------------------------ */
     match /applications/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read, create, update, delete: if isSignedIn();
     }
 
     /* -------------------- Posts (announcements + what's new) -------------------- */
     match /posts/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isSignedIn();
     }
 
     /* --------------------------------- Settings --------------------------------- */
     match /settings/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isSignedIn();
+    }
+
+    /* ----------------------------- Admin Tokens --------------------------------- */
+    match /admin_tokens/{tokenId} {
+      allow read, write: if isSignedIn();
     }
   }
 }
