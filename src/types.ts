@@ -99,29 +99,3 @@ export interface Post {
   pinned: boolean;
   createdAt: Timestamp | null;
 }
-
-export interface RoleResource {
-  id: string;
-  label: string;
-  url: string;
-  type: 'link' | 'video' | 'document' | 'tool';
-}
-
-export interface RoleTask {
-  id: string;
-  title: string;
-  description: string;
-  status: 'Open' | 'In Progress' | 'Completed';
-  deadline?: string;
-}
-
-export interface RoleFieldContent {
-  role: string;
-  bannerImageUrl: string;
-  videoUrl: string;
-  title: string;
-  description: string;
-  announcement: string;
-  resources: RoleResource[];
-  tasks: RoleTask[];
-}

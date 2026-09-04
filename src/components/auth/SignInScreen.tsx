@@ -51,7 +51,7 @@ export default function SignInScreen() {
     try {
       await signInWithAppleStub();
     } catch (err) {
-      setError((err as Error).message);
+      setError(friendlyAuthError(err));
     }
   };
 

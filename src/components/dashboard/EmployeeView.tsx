@@ -9,15 +9,13 @@ import {
   RefreshCw,
   XCircle,
   Briefcase,
-  ChevronRight,
-  ExternalLink,
+  Users,
 } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { submitApplication, verifyAndRedeemEmployeeToken } from '../../lib/data';
 import { EMPLOYEE_ROLES } from '../../lib/constants';
 import type { UserProfile, Application } from '../../types';
-import RoleFieldPage from './RoleFieldPage';
 
 export default function EmployeeView({
   profile,
@@ -37,9 +35,6 @@ export default function EmployeeView({
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenError, setTokenError] = useState('');
   const [tokenSuccessRole, setTokenSuccessRole] = useState<string | null>(null);
-
-  // Active role field page view state
-  const [openRolePage, setOpenRolePage] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'applications'), where('uid', '==', profile.uid));
@@ -92,18 +87,7 @@ export default function EmployeeView({
     }
   };
 
-  if (openRolePage) {
-    return (
-      <RoleFieldPage
-        role={openRolePage}
-        userName={profile.name}
-        onBack={() => setOpenRolePage(null)}
-      />
-    );
-  }
-
   const userRoles = Array.isArray(profile.employeeRoles) ? profile.employeeRoles : [];
-  const submitted = !!latestApplication;
   const isAccepted = latestApplication?.status === 'accepted';
   const isRejected = latestApplication?.status === 'rejected';
   const isPending = latestApplication?.status === 'new' || latestApplication?.status === 'reviewing';
@@ -125,40 +109,22 @@ export default function EmployeeView({
           <ArrowLeft size={18} strokeWidth={2.5} />
         </button>
         <div>
-          <h2 className="text-[17px] font-extrabold text-[var(--text-90)] leading-tight">Employment & Role Hub</h2>
-          <p className="text-[11px] font-bold text-[var(--text-50)]">Cherry Labs Internal Sectors</p>
+          <h2 className="text-[17px] font-extrabold text-[var(--text-90)] leading-tight">Employment Hub</h2>
+          <p className="text-[11px] font-bold text-[var(--text-50)]">Cherry Labs Careers</p>
         </div>
       </div>
 
       <div className="flex-1 w-full max-w-2xl mx-auto flex flex-col pt-8 pb-20 px-6 gap-6">
-        {/* UNLOCKED ROLES SECTION */}
+        {/* OFFICIAL EMPLOYEE STATUS NOTICE */}
         {userRoles.length > 0 && (
-          <div className="p-6 rounded-3xl bg-[var(--surface-50)] border border-[var(--border-70)] shadow-sm flex flex-col gap-4">
+          <div className="p-6 rounded-3xl bg-[var(--surface-50)] border border-[var(--border-70)] shadow-sm flex flex-col gap-3">
             <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-90)] flex items-center gap-2">
               <ShieldCheck size={18} className="text-emerald-500" />
-              Your Unlocked Workstations ({userRoles.length})
+              Official Employment Granted
             </h3>
-
-            <div className="flex flex-col gap-2">
-              {userRoles.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setOpenRolePage(r)}
-                  className="p-4 rounded-2xl bg-[var(--surface-20)] hover:bg-[var(--surface-30)] border border-[var(--border-50)] flex items-center justify-between text-left transition-all active:scale-[0.98] group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      <Briefcase size={18} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-extrabold text-[var(--text-100)]">{r} Portal</p>
-                      <p className="text-[11px] font-bold text-[var(--text-50)]">Tap to open field workstation</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} className="text-[var(--text-40)] group-hover:text-[var(--text-100)] group-hover:translate-x-1 transition-all" />
-                </button>
-              ))}
-            </div>
+            <p className="text-xs font-semibold text-[var(--text-70)] leading-relaxed">
+              Welcome to the team! Your official employment tag (<strong className="text-[var(--text-100)]">{userRoles.join(', ')}</strong>) is now active on your Membership Details page. Please stand by as the recruitment team reaches out to you directly.
+            </p>
           </div>
         )}
 
@@ -199,17 +165,13 @@ export default function EmployeeView({
             )}
 
             {tokenSuccessRole && (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex flex-col gap-2">
-                <span className="flex items-center gap-2 font-black">
-                  <ShieldCheck size={16} /> Workspace Unlocked Successfully!
+              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex flex-col gap-2">
+                <span className="flex items-center gap-2 font-black text-sm">
+                  <ShieldCheck size={18} /> Welcome to the team!
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setOpenRolePage(tokenSuccessRole)}
-                  className="mt-1 px-4 py-2.5 rounded-xl bg-emerald-500 text-black font-black text-xs hover:bg-emerald-400 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <ExternalLink size={14} /> Open {tokenSuccessRole} Field Workstation
-                </button>
+                <p className="text-xs font-semibold text-[var(--text-80)] leading-relaxed">
+                  Your token for <strong className="text-[var(--text-100)]">{tokenSuccessRole}</strong> was successfully verified and redeemed. Your official employee badge and role tag have been unlocked on your Membership Details profile. Please wait until the recruitment team reaches out to you with next steps.
+                </p>
               </div>
             )}
 

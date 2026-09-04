@@ -345,23 +345,6 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
   return appData.role;
 }
 
-/* ---------------------------- Role Content ------------------------------- */
-import type { RoleFieldContent } from '../types';
-
-export function subscribeRoleContent(role: string, cb: (content: RoleFieldContent | null) => void) {
-  return onSnapshot(doc(db, 'role_contents', role), (snap) => {
-    if (snap.exists()) {
-      cb(snap.data() as RoleFieldContent);
-    } else {
-      cb(null);
-    }
-  });
-}
-
-export async function saveRoleContent(role: string, content: Partial<RoleFieldContent>) {
-  await setDoc(doc(db, 'role_contents', role), { role, ...content }, { merge: true });
-}
-
 export async function updateApplicationNote(id: string, adminNote: string) {
   await updateDoc(doc(db, 'applications', id), { adminNote });
 }
