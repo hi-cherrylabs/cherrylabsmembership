@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, useMotionValueEvent } from 'motion/react';
-import { MessageCircle, User, Lightbulb, Briefcase, Newspaper, ChevronLeft, ChevronRight, Award } from 'lucide-react';
+import { MessageCircle, User, Lightbulb, Briefcase, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScrollOption } from '../Shared';
 import type { Post, UserProfile } from '../../types';
 
@@ -62,7 +62,7 @@ const CAROUSEL_GAP = 48;
 
 export default function DashboardMain({
   posts,
-  profile,
+  profile: _profile,
   onNavigate,
 }: {
   posts: Post[];
@@ -70,15 +70,7 @@ export default function DashboardMain({
   onNavigate: (view: DashboardSubView) => void;
   key?: string;
 }) {
-  const userRoles = profile && Array.isArray(profile.employeeRoles) ? profile.employeeRoles : [];
-  const unlockedRoleOptions = userRoles.map((r) => ({
-    icon: Award,
-    label: `${r} Workstation`,
-    desc: `Official workstation & directives for ${r}`,
-    view: `role_${r}`,
-  }));
-
-  const allDashboardOptions = [...unlockedRoleOptions, ...BASE_DASHBOARD_OPTIONS];
+  const allDashboardOptions = BASE_DASHBOARD_OPTIONS;
   const dashboardScrollRef = useRef<HTMLDivElement>(null);
   const carouselMeasureRef = useRef<HTMLDivElement>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);

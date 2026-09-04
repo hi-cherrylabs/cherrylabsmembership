@@ -123,11 +123,5 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    /* ------------------------------ Role Content -------------------------------- */
-    match /role_contents/{role} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
   }
 }

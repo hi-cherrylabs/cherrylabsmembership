@@ -29,9 +29,8 @@ import AdminApplications from './AdminApplications';
 import AdminPosts from './AdminPosts';
 import AdminSettings from './AdminSettings';
 import AdminManager from './AdminManager';
-import AdminRoleContentManager from './AdminRoleContentManager';
 
-type Tab = 'overview' | 'members' | 'suggestions' | 'moderation' | 'applications' | 'role_pages' | 'posts' | 'settings' | 'admins';
+type Tab = 'overview' | 'members' | 'suggestions' | 'moderation' | 'applications' | 'posts' | 'settings' | 'admins';
 
 const BASE_TABS: { id: Tab; label: string; desc: string; icon: any }[] = [
   { id: 'overview', label: 'Overview', desc: 'Members, VIP passes & activity at a glance', icon: LayoutGrid },
@@ -39,7 +38,6 @@ const BASE_TABS: { id: Tab; label: string; desc: string; icon: any }[] = [
   { id: 'suggestions', label: 'Suggestions', desc: 'Reply to member suggestion threads', icon: MessageSquare },
   { id: 'moderation', label: 'Chat Moderation', desc: 'Review & moderate the community chat', icon: ShieldAlert },
   { id: 'applications', label: 'Applications', desc: 'Review employee applications', icon: Briefcase },
-  { id: 'role_pages', label: 'Field Page Customizer', desc: 'Manage media & content for employment field pages', icon: Settings },
   { id: 'posts', label: 'Posts', desc: 'Manage announcements & what\u2019s new', icon: Newspaper },
   { id: 'settings', label: 'Settings', desc: 'Admin account & benefits copy', icon: Settings },
 ];
@@ -148,7 +146,6 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               {activeTab === 'suggestions' && <AdminSuggestions threads={threads} />}
               {activeTab === 'moderation' && <AdminChatModeration messages={communityMessages} />}
               {activeTab === 'applications' && <AdminApplications applications={applications} />}
-              {activeTab === 'role_pages' && <AdminRoleContentManager />}
               {activeTab === 'posts' && <AdminPosts posts={posts} />}
               {activeTab === 'settings' && <AdminSettings />}
               {activeTab === 'admins' && isSuperAdmin && <AdminManager />}
