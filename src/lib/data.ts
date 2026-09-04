@@ -230,7 +230,8 @@ export async function updateApplicationStatus(
     });
 
     if (uid && role) {
-      const empTokenRef = doc(collection(db, 'employee_tokens'));
+      const tokenDocId = `${uid}_${role.replace(/\s+/g, '_')}`;
+      const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
       await setDoc(empTokenRef, {
         token: tokenCode,
         applicationId: id,
@@ -273,16 +274,22 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
     throw new Error('This token has already been redeemed for access.');
   }
 
+  // Check time-based token expiration
+  if (appData.tokenType === 'time_based' && appData.tokenExpiresAt) {
+    const expMs = typeof appData.tokenExpiresAt.toMillis === 'function' ? appData.tokenExpiresAt.toMillis() : 0;
+    if (expMs && expMs <= Date.now()) {
+      await updateDoc(matchAppDoc.ref, { tokenStatus: 'expired' });
+      throw new Error('This access token has expired.');
+    }
+  }
+
   // Mark application token redeemed
   await updateDoc(matchAppDoc.ref, { tokenStatus: 'redeemed' });
 
-  // Update employee_tokens if exists for this user
-  const tokensQuery = query(collection(db, 'employee_tokens'), where('uid', '==', user.uid));
-  const tokensSnap = await getDocs(tokensQuery);
-  const matchTokenDoc = tokensSnap.docs.find((d) => d.data().token === cleanCode);
-  if (matchTokenDoc) {
-    await updateDoc(matchTokenDoc.ref, { status: 'redeemed', usedAt: serverTimestamp() });
-  }
+  // Update employee_tokens
+  const tokenDocId = `${user.uid}_${appData.role.replace(/\s+/g, '_')}`;
+  const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
+  await setDoc(empTokenRef, { status: 'redeemed', usedAt: serverTimestamp() }, { merge: true });
 
   // Add role to user profile
   const currentRoles = Array.isArray(user.employeeRoles) ? user.employeeRoles : [];

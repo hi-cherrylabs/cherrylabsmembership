@@ -33,6 +33,14 @@ service cloud.firestore {
         isOwner(uid) &&
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['banned'])) &&
         (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['employeeRoles']) ||
+          request.resource.data.employeeRoles == resource.data.employeeRoles ||
+          (
+            exists(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])) &&
+            get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status == 'redeemed'
+          )
+        ) &&
+        (
           request.resource.data.isAdmin == resource.data.isAdmin ||
           (
             request.resource.data.isAdmin == true &&
