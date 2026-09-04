@@ -57,6 +57,18 @@ service cloud.firestore {
       );
     }
 
+    /* -------------------------- Employee Tokens ---------------------------- */
+    match /employee_tokens/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        resource.data.uid == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'redeemed'
+      );
+    }
+
     /* --------------------------- Community chat ---------------------------- */
     match /community_messages/{id} {
       allow read: if isSignedIn();
@@ -97,6 +109,12 @@ service cloud.firestore {
 
     /* --------------------------------- Settings --------------------------------- */
     match /settings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    /* ------------------------------ Role Content -------------------------------- */
+    match /role_contents/{role} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }

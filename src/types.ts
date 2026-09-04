@@ -16,6 +16,7 @@ export interface UserProfile {
   isAdmin: boolean;
   adminTokenId?: string | null;
   adminExpiresAt?: Timestamp | null;
+  employeeRoles?: string[];
   createdAt: Timestamp | null;
   vipExpiresAt: Timestamp | null;
 }
@@ -32,6 +33,17 @@ export interface AdminToken {
   usedAt: Timestamp | null;
   status: 'pending' | 'active' | 'expired' | 'revoked';
   createdBy: string;
+  createdAt: Timestamp | null;
+}
+
+export interface EmployeeToken {
+  id: string;
+  token: string;
+  applicationId: string;
+  uid: string;
+  role: string;
+  status: 'pending' | 'redeemed' | 'revoked';
+  usedAt: Timestamp | null;
   createdAt: Timestamp | null;
 }
 
@@ -72,6 +84,8 @@ export interface Application {
   role: string;
   status: ApplicationStatus;
   adminNote: string;
+  tokenCode?: string;
+  tokenStatus?: 'pending' | 'redeemed' | 'revoked';
   createdAt: Timestamp | null;
 }
 
@@ -84,4 +98,30 @@ export interface Post {
   badge: string;
   pinned: boolean;
   createdAt: Timestamp | null;
+}
+
+export interface RoleResource {
+  id: string;
+  label: string;
+  url: string;
+  type: 'link' | 'video' | 'document' | 'tool';
+}
+
+export interface RoleTask {
+  id: string;
+  title: string;
+  description: string;
+  status: 'Open' | 'In Progress' | 'Completed';
+  deadline?: string;
+}
+
+export interface RoleFieldContent {
+  role: string;
+  bannerImageUrl: string;
+  videoUrl: string;
+  title: string;
+  description: string;
+  announcement: string;
+  resources: RoleResource[];
+  tasks: RoleTask[];
 }
