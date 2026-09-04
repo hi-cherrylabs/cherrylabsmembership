@@ -44,7 +44,7 @@ export const TANZANIA_REGIONS: string[] = [
   'Tanga', 'Zanzibar North', 'Zanzibar South', 'Zanzibar West',
 ];
 
-export const EMPLOYEE_ROLES = ['Influencer', 'Developer', 'Model', 'Advertiser'];
+export const EMPLOYEE_ROLES = ['Influencer', 'Developer', 'Model', 'Advertiser', 'Brand Ambassador'];
 
 export const READING_PARAGRAPHS_FALLBACK = [
   {

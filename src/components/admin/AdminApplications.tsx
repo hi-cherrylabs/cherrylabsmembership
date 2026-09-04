@@ -24,6 +24,10 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
     }
   };
 
+  const handleStatusChange = async (s: ApplicationStatus) => {
+    await updateApplicationStatus(app.id, s, app.role, app.uid);
+  };
+
   return (
     <div className="bg-[var(--surface-40)] backdrop-blur-xl border border-[var(--border-60)] rounded-2xl p-4 flex flex-col gap-3 shadow-[0_4px_16px_rgba(0,0,0,0.03)]">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -36,11 +40,17 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
         </span>
       </div>
       <p className="text-sm font-semibold text-[var(--text-70)]">Applying for: <span className="font-extrabold text-[var(--text-90)]">{app.role}</span></p>
+      {app.tokenCode && (
+        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono font-bold text-amber-600 dark:text-amber-400 flex items-center justify-between">
+          <span>Generated Token: {app.tokenCode}</span>
+          <span className="text-[10px] uppercase font-sans font-black">{app.tokenStatus || 'pending'}</span>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
           <button
             key={s}
-            onClick={() => updateApplicationStatus(app.id, s)}
+            onClick={() => handleStatusChange(s)}
             className={`text-xs font-bold px-3 py-1.5 rounded-full capitalize transition-all border ${
               app.status === s
                 ? 'bg-[var(--invert-bg)] text-[var(--invert-text)] border-black'

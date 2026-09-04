@@ -200,8 +200,97 @@ export function subscribeApplications(cb: (apps: Application[]) => void) {
   });
 }
 
-export async function updateApplicationStatus(id: string, status: ApplicationStatus) {
-  await updateDoc(doc(db, 'applications', id), { status });
+export async function updateApplicationStatus(id: string, status: ApplicationStatus, role?: string, uid?: string) {
+  if (status === 'accepted') {
+    const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let rand = '';
+    for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    const tokenCode = `EMP-${rolePrefix}-${rand}`;
+
+    await updateDoc(doc(db, 'applications', id), {
+      status,
+      tokenCode,
+      tokenStatus: 'pending',
+    });
+
+    if (uid && role) {
+      const empTokenRef = doc(collection(db, 'employee_tokens'));
+      await setDoc(empTokenRef, {
+        token: tokenCode,
+        applicationId: id,
+        uid,
+        role,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+    }
+  } else {
+    await updateDoc(doc(db, 'applications', id), { status });
+  }
+}
+
+export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: UserProfile) {
+  const cleanCode = enteredCode.trim().toUpperCase();
+  if (!cleanCode) throw new Error('Please enter your authorization token code.');
+
+  // Find matching employee application for this user
+  const appsQuery = query(collection(db, 'applications'), where('uid', '==', user.uid));
+  const appsSnap = await getDocs(appsQuery);
+  const matchAppDoc = appsSnap.docs.find((d) => {
+    const data = d.data() as Application;
+    return (
+      data.status === 'accepted' &&
+      (data.tokenCode || '').trim().toUpperCase() === cleanCode
+    );
+  });
+
+  if (!matchAppDoc) {
+    throw new Error('Invalid or unassigned authorization token code.');
+  }
+
+  const appData = matchAppDoc.data() as Application;
+
+  if (appData.tokenStatus === 'redeemed') {
+    throw new Error('This token has already been redeemed for access.');
+  }
+
+  // Mark application token redeemed
+  await updateDoc(matchAppDoc.ref, { tokenStatus: 'redeemed' });
+
+  // Update employee_tokens if exists for this user
+  const tokensQuery = query(collection(db, 'employee_tokens'), where('uid', '==', user.uid));
+  const tokensSnap = await getDocs(tokensQuery);
+  const matchTokenDoc = tokensSnap.docs.find((d) => d.data().token === cleanCode);
+  if (matchTokenDoc) {
+    await updateDoc(matchTokenDoc.ref, { status: 'redeemed', usedAt: serverTimestamp() });
+  }
+
+  // Add role to user profile
+  const currentRoles = Array.isArray(user.employeeRoles) ? user.employeeRoles : [];
+  if (!currentRoles.includes(appData.role)) {
+    const updatedRoles = [...currentRoles, appData.role];
+    await updateDoc(doc(db, 'users', user.uid), { employeeRoles: updatedRoles });
+  }
+
+  return appData.role;
+}
+
+/* ---------------------------- Role Content ------------------------------- */
+import type { RoleFieldContent } from '../types';
+
+export function subscribeRoleContent(role: string, cb: (content: RoleFieldContent | null) => void) {
+  return onSnapshot(doc(db, 'role_contents', role), (snap) => {
+    if (snap.exists()) {
+      cb(snap.data() as RoleFieldContent);
+    } else {
+      cb(null);
+    }
+  });
+}
+
+export async function saveRoleContent(role: string, content: Partial<RoleFieldContent>) {
+  await setDoc(doc(db, 'role_contents', role), { role, ...content }, { merge: true });
 }
 
 export async function updateApplicationNote(id: string, adminNote: string) {
