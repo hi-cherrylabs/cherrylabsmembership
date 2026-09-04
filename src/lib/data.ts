@@ -375,7 +375,7 @@ export async function verifyAndRedeemAdminToken(
   }
 
   if ((tokenData.email || '').toLowerCase() !== cleanUserEmail) {
-    throw new Error(`This token was issued specifically for ${tokenData.email}. Your current email (${cleanUserEmail}) is not authorized for this token.`);
+    throw new Error('This access token is not authorized for your account.');
   }
 
   if (tokenData.type === 'time_based' && tokenData.expiresAt) {

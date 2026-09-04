@@ -2,9 +2,11 @@ import { useEffect, useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { KeyRound, Copy, Check, ShieldAlert, ShieldCheck, Clock, Trash2, UserPlus, RefreshCw } from 'lucide-react';
 import { createAdminToken, subscribeAdminTokens, revokeAdminToken } from '../../lib/data';
+import { useAuth } from '../../context/AuthContext';
 import type { AdminToken } from '../../types';
 
 export default function AdminManager() {
+  const { isSuperAdmin } = useAuth();
   const [tokens, setTokens] = useState<AdminToken[]>([]);
   const [email, setEmail] = useState('');
   const [type, setType] = useState<'standard' | 'time_based'>('standard');
@@ -15,9 +17,18 @@ export default function AdminManager() {
   const [lastGenerated, setLastGenerated] = useState<AdminToken | null>(null);
 
   useEffect(() => {
+    if (!isSuperAdmin) return;
     const unsub = subscribeAdminTokens((data) => setTokens(data as AdminToken[]));
     return () => unsub();
-  }, []);
+  }, [isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-8 rounded-3xl bg-[var(--surface-50)] border border-[var(--border-70)] text-center text-xs font-bold text-red-500">
+        Access restricted. This section is strictly reserved for the Supreme Administrator.
+      </div>
+    );
+  }
 
   const handleGenerate = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,7 +60,7 @@ export default function AdminManager() {
       try {
         await revokeAdminToken(token.id, token.email);
       } catch (err: any) {
-        alert('Failed to revoke admin: ' + err.message);
+        alert('Failed to revoke admin privileges. Please try again.');
       }
     }
   };
