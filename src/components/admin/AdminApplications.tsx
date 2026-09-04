@@ -1,6 +1,12 @@
 import { useState } from 'react';
-import { KeyRound, Check, ShieldAlert, Clock, Copy, RefreshCw } from 'lucide-react';
-import { updateApplicationStatus, updateApplicationNote } from '../../lib/data';
+import { KeyRound, Check, ShieldAlert, Clock, Copy, RefreshCw, Trash2, Ban } from 'lucide-react';
+import {
+  updateApplicationStatus,
+  updateApplicationNote,
+  generateEmployeeTokenForApplication,
+  revokeEmployeeToken,
+  deleteEmployeeToken,
+} from '../../lib/data';
 import type { Application, ApplicationStatus } from '../../types';
 
 const STATUS_STYLES: Record<ApplicationStatus, string> = {
@@ -15,10 +21,12 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
   const [savingNote, setSavingNote] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  // Accept configuration state
+  // Accept/Token configuration state
   const [tokenType, setTokenType] = useState<'standard' | 'time_based'>('standard');
   const [durationHours, setDurationHours] = useState(24);
-  const [accepting, setAccepting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const saveNote = async () => {
     setSavingNote(true);
@@ -29,20 +37,44 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
     }
   };
 
-  const handleAccept = async () => {
-    setAccepting(true);
+  const handleGenerateToken = async () => {
+    setGenerating(true);
     try {
-      await updateApplicationStatus(app.id, 'accepted', app.role, app.uid, tokenType, durationHours);
+      await generateEmployeeTokenForApplication(app.id, app.uid, app.role, tokenType, durationHours);
+    } catch {
+      alert('Failed to generate token. Please try again.');
     } finally {
-      setAccepting(false);
+      setGenerating(false);
+    }
+  };
+
+  const handleRevokeToken = async () => {
+    if (window.confirm(`Revoke token for ${app.name}? Their role access will be removed immediately.`)) {
+      setRevoking(true);
+      try {
+        await revokeEmployeeToken(app.id, app.uid, app.role);
+      } finally {
+        setRevoking(false);
+      }
+    }
+  };
+
+  const handleDeleteToken = async () => {
+    if (window.confirm(`Delete token record for ${app.name}? This removes the generated key from Firebase.`)) {
+      setDeleting(true);
+      try {
+        await deleteEmployeeToken(app.id, app.uid, app.role);
+      } finally {
+        setDeleting(false);
+      }
     }
   };
 
   const handleStatusChange = async (s: ApplicationStatus) => {
     if (s === 'accepted') {
-      await handleAccept();
+      await handleGenerateToken();
     } else {
-      await updateApplicationStatus(app.id, s, app.role, app.uid);
+      await updateApplicationStatus(app.id, s);
     }
   };
 
@@ -67,19 +99,19 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
       </div>
 
       <div className="p-4 rounded-2xl bg-[var(--surface-20)] border border-[var(--border-50)] flex items-center justify-between">
-        <span className="text-xs font-bold text-[var(--text-60)]">Applying for Field:</span>
+        <span className="text-xs font-bold text-[var(--text-60)]">Applied Field:</span>
         <span className="text-xs font-black text-[var(--text-100)] uppercase tracking-wider">{app.role}</span>
       </div>
 
-      {/* GENERATED TOKEN INFO IF ACCEPTED */}
-      {app.tokenCode && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2">
+      {/* TOKEN MANAGEMENT PANEL IF TOKEN EXISTS */}
+      {app.tokenCode ? (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <KeyRound size={14} /> Generated Access Token
+              <KeyRound size={14} /> Active Token Key
             </span>
-            <span className="text-[10px] font-extrabold text-[var(--text-60)] uppercase">
-              {app.tokenStatus || 'pending verification'}
+            <span className="text-[10px] font-black text-[var(--text-60)] uppercase">
+              Status: {app.tokenStatus || 'pending'}
             </span>
           </div>
 
@@ -87,21 +119,44 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
             <span className="font-mono text-base font-black tracking-widest text-[var(--text-100)]">
               {app.tokenCode}
             </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={copyToken}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 hover:bg-amber-400 transition-all"
+              >
+                {copiedToken ? <Check size={14} /> : <Copy size={14} />}
+                {copiedToken ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 justify-end pt-1">
+            {app.tokenStatus !== 'revoked' && (
+              <button
+                type="button"
+                disabled={revoking}
+                onClick={handleRevokeToken}
+                className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-black text-xs flex items-center gap-1 transition-all disabled:opacity-50"
+              >
+                <Ban size={14} />
+                {revoking ? 'Revoking…' : 'Revoke Token'}
+              </button>
+            )}
             <button
-              onClick={copyToken}
-              className="px-3.5 py-1.5 rounded-lg bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 hover:bg-amber-400 transition-all"
+              type="button"
+              disabled={deleting}
+              onClick={handleDeleteToken}
+              className="px-3 py-1.5 rounded-xl bg-gray-500/10 hover:bg-gray-500/20 text-[var(--text-70)] border border-gray-500/20 font-black text-xs flex items-center gap-1 transition-all disabled:opacity-50"
             >
-              {copiedToken ? <Check size={14} /> : <Copy size={14} />}
-              {copiedToken ? 'Copied' : 'Copy'}
+              <Trash2 size={14} />
+              {deleting ? 'Deleting…' : 'Delete Key'}
             </button>
           </div>
         </div>
-      )}
-
-      {/* ACCEPT CONFIGURATION PANEL FOR PENDING/REVIEWING APPLICATIONS */}
-      {app.status !== 'accepted' && (
+      ) : (
+        /* TOKEN CONFIGURATION & GENERATE BUTTON */
         <div className="p-4 rounded-2xl bg-[var(--surface-20)] border border-[var(--border-50)] flex flex-col gap-3">
-          <span className="text-xs font-extrabold text-[var(--text-90)]">Authorize Access Token Type</span>
+          <span className="text-xs font-extrabold text-[var(--text-90)]">Authorize Token Key Privilege</span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -140,25 +195,41 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
               <option value={168}>7 Days (1 Week)</option>
             </select>
           )}
+
+          <button
+            type="button"
+            disabled={generating}
+            onClick={handleGenerateToken}
+            className="mt-1 px-4 py-3 rounded-xl bg-amber-500 text-black font-black text-xs hover:bg-amber-400 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {generating ? <RefreshCw size={16} className="animate-spin" /> : <KeyRound size={16} />}
+            Generate Access Token & Approve
+          </button>
         </div>
       )}
 
-      {/* ACTION BUTTONS */}
+      {/* STATUS & REJECT BUTTONS */}
       <div className="flex flex-wrap gap-2">
-        {(['new', 'reviewing', 'accepted', 'rejected'] as ApplicationStatus[]).map((s) => (
-          <button
-            key={s}
-            disabled={accepting}
-            onClick={() => handleStatusChange(s)}
-            className={`text-xs font-black px-4 py-2 rounded-xl capitalize transition-all border ${
-              app.status === s
-                ? 'bg-[var(--invert-bg)] text-[var(--invert-text)] border-black'
-                : 'bg-[var(--surface-20)] text-[var(--text-70)] border-[var(--border-50)] hover:bg-[var(--surface-30)]'
-            }`}
-          >
-            {s === 'accepted' ? (accepting ? 'Generating Token...' : 'Approve & Issue Token') : s}
-          </button>
-        ))}
+        <button
+          onClick={() => handleStatusChange('reviewing')}
+          className={`text-xs font-black px-4 py-2 rounded-xl capitalize transition-all border ${
+            app.status === 'reviewing'
+              ? 'bg-[var(--invert-bg)] text-[var(--invert-text)] border-black'
+              : 'bg-[var(--surface-20)] text-[var(--text-70)] border-[var(--border-50)] hover:bg-[var(--surface-30)]'
+          }`}
+        >
+          Set Under Review
+        </button>
+        <button
+          onClick={() => handleStatusChange('rejected')}
+          className={`text-xs font-black px-4 py-2 rounded-xl capitalize transition-all border ${
+            app.status === 'rejected'
+              ? 'bg-red-500 text-white border-red-600'
+              : 'bg-[var(--surface-20)] text-red-500 border border-red-500/20 hover:bg-red-500/10'
+          }`}
+        >
+          Decline Application
+        </button>
       </div>
 
       {/* ADMIN NOTE */}

@@ -36,6 +36,7 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['employeeRoles']) ||
           request.resource.data.employeeRoles == resource.data.employeeRoles ||
           (
+            request.resource.data.employeeRoles.hasAll(resource.data.employeeRoles) &&
             exists(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])) &&
             get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status == 'redeemed'
           )
@@ -71,9 +72,7 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
         isSignedIn() &&
-        resource.data.uid == request.auth.uid &&
-        resource.data.status == 'pending' &&
-        request.resource.data.status == 'redeemed'
+        resource.data.uid == request.auth.uid
       );
     }
 
@@ -105,7 +104,11 @@ service cloud.firestore {
     match /applications/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        resource.data.uid == request.auth.uid &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'uid', 'role', 'tokenCode', 'tokenStatus', 'tokenType', 'tokenExpiresAt']))
+      );
       allow delete: if isAdmin();
     }
 
