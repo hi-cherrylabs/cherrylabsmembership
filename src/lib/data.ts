@@ -201,53 +201,96 @@ export function subscribeApplications(cb: (apps: Application[]) => void) {
   });
 }
 
-export async function updateApplicationStatus(
-  id: string,
-  status: ApplicationStatus,
-  role?: string,
-  uid?: string,
-  tokenType: 'standard' | 'time_based' = 'standard',
+export async function updateApplicationStatus(id: string, status: ApplicationStatus) {
+  await updateDoc(doc(db, 'applications', id), { status });
+}
+
+export async function generateEmployeeTokenForApplication(
+  applicationId: string,
+  uid: string,
+  role: string,
+  type: 'standard' | 'time_based' = 'standard',
   durationHours: number = 24
 ) {
-  if (status === 'accepted') {
-    const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let rand = '';
-    for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
-    const tokenCode = `EMP-${rolePrefix}-${rand}`;
+  const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  const tokenCode = `EMP-${rolePrefix}-${rand}`;
 
-    let expiresAt: Timestamp | null = null;
-    if (tokenType === 'time_based') {
-      expiresAt = Timestamp.fromMillis(Date.now() + durationHours * 60 * 60 * 1000);
-    }
-
-    await updateDoc(doc(db, 'applications', id), {
-      status,
-      tokenCode,
-      tokenType,
-      tokenDurationHours: tokenType === 'time_based' ? durationHours : null,
-      tokenExpiresAt: expiresAt,
-      tokenStatus: 'pending',
-    });
-
-    if (uid && role) {
-      const tokenDocId = `${uid}_${role}`;
-      const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
-      await setDoc(empTokenRef, {
-        token: tokenCode,
-        applicationId: id,
-        uid,
-        role,
-        type: tokenType,
-        durationHours: tokenType === 'time_based' ? durationHours : null,
-        expiresAt,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
-    }
-  } else {
-    await updateDoc(doc(db, 'applications', id), { status });
+  let expiresAt: Timestamp | null = null;
+  if (type === 'time_based') {
+    expiresAt = Timestamp.fromMillis(Date.now() + durationHours * 60 * 60 * 1000);
   }
+
+  // Delete any stale/previous tokens for this user and role
+  const tokenDocId = `${uid}_${role}`;
+  const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
+
+  await setDoc(empTokenRef, {
+    token: tokenCode,
+    applicationId,
+    uid,
+    role,
+    type,
+    durationHours: type === 'time_based' ? durationHours : null,
+    expiresAt,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    status: 'accepted',
+    tokenCode,
+    tokenType: type,
+    tokenDurationHours: type === 'time_based' ? durationHours : null,
+    tokenExpiresAt: expiresAt,
+    tokenStatus: 'pending',
+  });
+
+  return tokenCode;
+}
+
+export async function revokeEmployeeToken(applicationId: string, uid: string, role: string) {
+  const tokenDocId = `${uid}_${role}`;
+  const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    tokenStatus: 'revoked',
+  });
+
+  try {
+    await updateDoc(empTokenRef, { status: 'revoked' });
+  } catch {
+    // Ignore if token doc didn't exist
+  }
+
+  // Remove role from user profile if previously granted
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const data = userSnap.data() as UserProfile;
+    const roles = Array.isArray(data.employeeRoles) ? data.employeeRoles.filter((r) => r !== role) : [];
+    await updateDoc(userRef, { employeeRoles: roles });
+  }
+}
+
+export async function deleteEmployeeToken(applicationId: string, uid: string, role: string) {
+  const tokenDocId = `${uid}_${role}`;
+  const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
+
+  try {
+    await deleteDoc(empTokenRef);
+  } catch {
+    // Ignore if already deleted
+  }
+
+  await updateDoc(doc(db, 'applications', applicationId), {
+    tokenCode: null,
+    tokenStatus: null,
+    tokenType: null,
+    tokenExpiresAt: null,
+  });
 }
 
 export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: UserProfile) {
