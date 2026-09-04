@@ -200,7 +200,14 @@ export function subscribeApplications(cb: (apps: Application[]) => void) {
   });
 }
 
-export async function updateApplicationStatus(id: string, status: ApplicationStatus, role?: string, uid?: string) {
+export async function updateApplicationStatus(
+  id: string,
+  status: ApplicationStatus,
+  role?: string,
+  uid?: string,
+  tokenType: 'standard' | 'time_based' = 'standard',
+  durationHours: number = 24
+) {
   if (status === 'accepted') {
     const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -208,9 +215,17 @@ export async function updateApplicationStatus(id: string, status: ApplicationSta
     for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
     const tokenCode = `EMP-${rolePrefix}-${rand}`;
 
+    let expiresAt: Timestamp | null = null;
+    if (tokenType === 'time_based') {
+      expiresAt = Timestamp.fromMillis(Date.now() + durationHours * 60 * 60 * 1000);
+    }
+
     await updateDoc(doc(db, 'applications', id), {
       status,
       tokenCode,
+      tokenType,
+      tokenDurationHours: tokenType === 'time_based' ? durationHours : null,
+      tokenExpiresAt: expiresAt,
       tokenStatus: 'pending',
     });
 
@@ -221,6 +236,9 @@ export async function updateApplicationStatus(id: string, status: ApplicationSta
         applicationId: id,
         uid,
         role,
+        type: tokenType,
+        durationHours: tokenType === 'time_based' ? durationHours : null,
+        expiresAt,
         status: 'pending',
         createdAt: serverTimestamp(),
       });
