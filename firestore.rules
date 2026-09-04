@@ -28,15 +28,33 @@ service cloud.firestore {
     /* ------------------------------ Members ------------------------------- */
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && (isSuperAdmin() || request.resource.data.isAdmin != true);
+      allow update: if isAdmin() || (
+        isOwner(uid) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['banned'])) &&
+        (
+          request.resource.data.isAdmin == resource.data.isAdmin ||
+          (
+            request.resource.data.isAdmin == true &&
+            request.resource.data.adminTokenId != null &&
+            get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.email.lower() == request.auth.token.email.lower() &&
+            get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.used == true
+          )
+        )
+      );
       allow delete: if isAdmin();
     }
 
     /* --------------------------- Admin Tokens ----------------------------- */
     match /admin_tokens/{id} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow read: if isSuperAdmin() || (isSignedIn() && resource.data.email.lower() == request.auth.token.email.lower());
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        isSignedIn() &&
+        resource.data.email.lower() == request.auth.token.email.lower() &&
+        resource.data.used == false &&
+        request.resource.data.used == true
+      );
     }
 
     /* --------------------------- Community chat ---------------------------- */

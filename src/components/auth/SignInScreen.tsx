@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 
 function friendlyAuthError(err: unknown): string {
   const code = (err as { code?: string })?.code || '';
-  const message = (err as Error)?.message || 'Something went wrong. Please try again.';
   switch (code) {
     case 'auth/email-already-in-use':
       return 'That email already has an account. Try logging in instead.';
@@ -20,7 +19,7 @@ function friendlyAuthError(err: unknown): string {
     case 'auth/popup-closed-by-user':
       return '';
     default:
-      return message;
+      return 'Authentication failed. Please check your credentials and try again.';
   }
 }
 
