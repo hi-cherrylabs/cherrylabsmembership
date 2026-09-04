@@ -9,6 +9,7 @@ import {
   setDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -230,7 +231,7 @@ export async function updateApplicationStatus(
     });
 
     if (uid && role) {
-      const tokenDocId = `${uid}_${role.replace(/\s+/g, '_')}`;
+      const tokenDocId = `${uid}_${role}`;
       const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
       await setDoc(empTokenRef, {
         token: tokenCode,
@@ -287,7 +288,7 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
   await updateDoc(matchAppDoc.ref, { tokenStatus: 'redeemed' });
 
   // Update employee_tokens
-  const tokenDocId = `${user.uid}_${appData.role.replace(/\s+/g, '_')}`;
+  const tokenDocId = `${user.uid}_${appData.role}`;
   const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
   await setDoc(empTokenRef, { status: 'redeemed', usedAt: serverTimestamp() }, { merge: true });
 
