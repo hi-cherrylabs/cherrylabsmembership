@@ -25,6 +25,7 @@ import SuggestView from './components/dashboard/SuggestView';
 import ProfileView from './components/dashboard/ProfileView';
 import EmployeeView from './components/dashboard/EmployeeView';
 import NewsView from './components/dashboard/NewsView';
+import RoleFieldPage from './components/dashboard/RoleFieldPage';
 import AdminPanel from './components/admin/AdminPanel';
 
 type Screen =
@@ -746,7 +747,14 @@ export default function App() {
         {screen === 'dashboard' && profile && user && (
           <>
             {dashboardView === 'main' && (
-              <DashboardMain key="dash_main" posts={posts} onNavigate={(v) => setDashboardView(v)} />
+              <DashboardMain key="dash_main" posts={posts} profile={profile} onNavigate={(v) => setDashboardView(v)} />
+            )}
+            {dashboardView.startsWith('role_') && (
+              <RoleFieldPage
+                role={dashboardView.replace('role_', '')}
+                userName={profile.name}
+                onBack={() => setDashboardView('main')}
+              />
             )}
             {dashboardView === 'community' && (
               <CommunityView

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, useMotionValueEvent } from 'motion/react';
-import { MessageCircle, User, Lightbulb, Briefcase, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageCircle, User, Lightbulb, Briefcase, Newspaper, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 import { ScrollOption } from '../Shared';
-import type { Post } from '../../types';
+import type { Post, UserProfile } from '../../types';
 
-export type DashboardSubView = 'community' | 'profile' | 'suggest' | 'employee' | 'news' | 'admin';
+export type DashboardSubView = 'community' | 'profile' | 'suggest' | 'employee' | 'news' | 'admin' | string;
 
-const DASHBOARD_OPTIONS: { icon: any; label: string; desc: string; view: DashboardSubView }[] = [
+const BASE_DASHBOARD_OPTIONS: { icon: any; label: string; desc: string; view: DashboardSubView }[] = [
   { icon: MessageCircle, label: 'Get in touch', desc: 'Direct channel with Cherry Labs coordinators', view: 'community' },
   { icon: User, label: 'Membership details', desc: 'View ID, VIP status & ownership score', view: 'profile' },
   { icon: Lightbulb, label: 'Offer a suggestion', desc: 'Propose new features & platform tweaks', view: 'suggest' },
@@ -62,12 +62,23 @@ const CAROUSEL_GAP = 48;
 
 export default function DashboardMain({
   posts,
+  profile,
   onNavigate,
 }: {
   posts: Post[];
+  profile?: UserProfile | null;
   onNavigate: (view: DashboardSubView) => void;
   key?: string;
 }) {
+  const userRoles = profile && Array.isArray(profile.employeeRoles) ? profile.employeeRoles : [];
+  const unlockedRoleOptions = userRoles.map((r) => ({
+    icon: Award,
+    label: `${r} Workstation`,
+    desc: `Official workstation & directives for ${r}`,
+    view: `role_${r}`,
+  }));
+
+  const allDashboardOptions = [...unlockedRoleOptions, ...BASE_DASHBOARD_OPTIONS];
   const dashboardScrollRef = useRef<HTMLDivElement>(null);
   const carouselMeasureRef = useRef<HTMLDivElement>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -214,7 +225,7 @@ export default function DashboardMain({
         <motion.div style={{ height: spacerHeight }} />
         <div className="flex flex-col items-center w-full">
           <div className="flex flex-col w-full max-w-sm gap-3 px-4 pb-40 shrink-0">
-            {DASHBOARD_OPTIONS.map((opt) => (
+            {allDashboardOptions.map((opt) => (
               <ScrollOption key={opt.view} containerRef={dashboardScrollRef}>
                 <button
                   onClick={() => onNavigate(opt.view)}
