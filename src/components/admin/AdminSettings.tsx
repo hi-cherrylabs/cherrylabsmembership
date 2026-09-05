@@ -31,9 +31,9 @@ export default function AdminSettings() {
   return (
     <div className="p-6 flex flex-col gap-6 max-w-2xl mx-auto">
       <div className="bg-[var(--surface-40)] backdrop-blur-xl border border-[var(--border-60)] rounded-2xl p-5 shadow-[0_4px_16px_rgba(0,0,0,0.03)]">
-        <p className="text-xs font-bold text-[var(--text-50)] uppercase tracking-wider mb-1">Admin Account</p>
-        <p className="text-sm font-extrabold text-[var(--text-90)]">{ADMIN_EMAIL}</p>
-        <p className="text-xs font-medium text-[var(--text-40)] mt-1">Signing in with this account unlocks the Admin Panel in the hamburger menu.</p>
+        <p className="text-xs font-bold text-[var(--text-50)] uppercase tracking-wider mb-1">System Account</p>
+        <p className="text-sm font-extrabold text-[var(--text-90)]">Supreme Admin Authorized</p>
+        <p className="text-xs font-medium text-[var(--text-40)] mt-1">Signing in with an authorized account unlocks management tools.</p>
       </div>
 
       <div>

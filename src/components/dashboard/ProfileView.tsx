@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Trash2, Edit2, Check, KeyRound, ShieldCheck, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit2, Check, KeyRound, ShieldCheck, AlertCircle, RefreshCw, X, Award, Briefcase } from 'lucide-react';
 import { deleteUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { updateProfileFields, deleteOwnProfileDoc, verifyAndRedeemAdminToken } from '../../lib/data';
@@ -153,6 +153,18 @@ export default function ProfileView({
                 <ShieldCheck size={14} /> Official Administrator
               </span>
             )}
+            {Array.isArray(profile.employeeRoles) && profile.employeeRoles.length > 0 && (
+              <>
+                <span className="px-4 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-black text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                  <Award size={14} /> Official Employment @ Cherry Labs Inc.
+                </span>
+                {profile.employeeRoles.map((role) => (
+                  <span key={role} className="px-4 py-1.5 rounded-full bg-emerald-500 text-black border border-emerald-400 font-black text-xs uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                    <Briefcase size={14} /> {role}
+                  </span>
+                ))}
+              </>
+            )}
             <span className={`px-4 py-1.5 rounded-full border font-bold text-xs uppercase tracking-wider shadow-sm ${vipActive ? 'bg-[var(--invert-bg)] text-[var(--invert-text)] border-black' : 'bg-[var(--surface-80)] border-[var(--border-70)] text-[var(--text-70)]'}`}>
               {vipActive ? 'Active VIP' : 'VIP Expired'}
             </span>
@@ -165,23 +177,18 @@ export default function ProfileView({
           </div>
         </div>
 
-        {/* ENTER ACCESS TOKEN SECTION */}
-        <div className="w-full p-6 rounded-3xl bg-[var(--surface-50)] border border-[var(--border-70)] shadow-sm flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
-              <KeyRound size={20} />
-            </div>
-            <div>
-              <h3 className="text-sm font-extrabold text-[var(--text-100)]">Enter Access Token</h3>
-              <p className="text-xs font-bold text-[var(--text-60)]">
-                Authorized team members can enter single-use admin tokens here.
-              </p>
-            </div>
+        {/* MINIMALIST ACCESS TOKEN DOCK */}
+        <div className="w-full p-5 rounded-2xl bg-[var(--surface-40)] border border-[var(--border-60)] shadow-sm flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <KeyRound size={15} className="text-amber-500" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-80)]">
+              Authorization Token Access
+            </span>
           </div>
 
           {tokenError && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold flex items-center gap-2">
-              <AlertCircle size={16} />
+            <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold flex items-center gap-2">
+              <AlertCircle size={15} />
               {tokenError}
             </div>
           )}
@@ -191,16 +198,15 @@ export default function ProfileView({
               type="text"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="e.g. ADM-7K9P-2M4X"
-              className="flex-1 px-4 py-3 rounded-2xl bg-[var(--surface-20)] border border-[var(--border-50)] text-[var(--text-100)] text-sm font-mono font-bold placeholder:text-[var(--text-40)] placeholder:font-sans outline-none focus:border-amber-500/60 uppercase transition-colors"
+              placeholder="Enter authorization code"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--surface-60)] border border-[var(--border-60)] text-[var(--text-100)] text-xs font-mono font-bold placeholder:text-[var(--text-40)] placeholder:font-sans outline-none focus:border-amber-500/60 uppercase transition-colors"
             />
             <button
               type="submit"
               disabled={tokenLoading}
-              className="px-6 py-3 rounded-2xl bg-amber-500 text-black font-black text-xs hover:bg-amber-400 active:scale-95 transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl bg-[var(--invert-bg)] text-[var(--invert-text)] font-extrabold text-xs hover:opacity-90 active:scale-95 transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 shrink-0"
             >
-              {tokenLoading ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-              Verify Code
+              {tokenLoading ? <RefreshCw size={14} className="animate-spin" /> : 'Verify Code'}
             </button>
           </form>
         </div>
@@ -230,10 +236,10 @@ export default function ProfileView({
 
               <div className="flex flex-col gap-2">
                 <h3 className="text-xl font-black text-[var(--text-100)] tracking-tight">
-                  Confirm Admin Role
+                  Confirm Privilege Activation
                 </h3>
                 <p className="text-xs font-bold text-[var(--text-70)] leading-relaxed">
-                  You are about to activate Administrator privileges for <strong className="text-[var(--text-100)]">{profile.email}</strong> using token code <strong className="font-mono text-amber-500">{verifiedTokenCode}</strong>.
+                  You are about to activate Administrator privileges on your account using token code <strong className="font-mono text-amber-500">{verifiedTokenCode}</strong>.
                 </p>
               </div>
 
