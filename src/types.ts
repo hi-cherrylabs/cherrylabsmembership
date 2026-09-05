@@ -85,7 +85,10 @@ export interface Application {
   status: ApplicationStatus;
   adminNote: string;
   tokenCode?: string;
-  tokenStatus?: 'pending' | 'redeemed' | 'revoked';
+  tokenType?: 'standard' | 'time_based';
+  tokenDurationHours?: number | null;
+  tokenExpiresAt?: Timestamp | null;
+  tokenStatus?: 'pending' | 'redeemed' | 'revoked' | 'expired';
   createdAt: Timestamp | null;
 }
 

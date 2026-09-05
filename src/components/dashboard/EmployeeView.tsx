@@ -81,7 +81,12 @@ export default function EmployeeView({
       setTokenSuccessRole(grantedRole);
       setTokenInput('');
     } catch (err: any) {
-      setTokenError(err.message || 'Verification failed. Please check your token.');
+      const rawMsg = err?.message || '';
+      if (rawMsg.includes('Invalid') || rawMsg.includes('expired') || rawMsg.includes('redeemed') || rawMsg.includes('enter your authorization token')) {
+        setTokenError(rawMsg);
+      } else {
+        setTokenError('Verification failed. Please check your authorization token code and try again.');
+      }
     } finally {
       setTokenLoading(false);
     }
@@ -175,7 +180,12 @@ export default function EmployeeView({
               </div>
             )}
 
-            {!tokenSuccessRole && (
+            {latestApplication?.tokenStatus === 'redeemed' || tokenSuccessRole ? (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
+                <ShieldCheck size={18} />
+                Authorization token code verified & redeemed.
+              </div>
+            ) : (
               <form onSubmit={handleRedeemToken} className="flex flex-col gap-3">
                 <label className="text-xs font-extrabold text-[var(--text-70)]">Authorization Token Code</label>
                 <div className="flex gap-2">
