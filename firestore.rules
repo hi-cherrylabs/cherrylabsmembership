@@ -38,7 +38,7 @@ service cloud.firestore {
           (
             (!('employeeRoles' in resource.data) || request.resource.data.employeeRoles.hasAll(resource.data.employeeRoles)) &&
             exists(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])) &&
-            get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status == 'redeemed'
+            get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status in ['pending', 'redeemed', 'used']
           )
         ) &&
         (
@@ -47,7 +47,8 @@ service cloud.firestore {
             request.resource.data.isAdmin == true &&
             request.resource.data.adminTokenId != null &&
             get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.email.lower() == request.auth.token.email.lower() &&
-            get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.used == true
+            (get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.used == true ||
+             get(/databases/$(database)/documents/admin_tokens/$(request.resource.data.adminTokenId)).data.status in ['used', 'active'])
           )
         )
       );
@@ -69,7 +70,8 @@ service cloud.firestore {
     /* -------------------------- Employee Tokens ---------------------------- */
     match /employee_tokens/{id} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
       allow update: if isAdmin() || (
         isSignedIn() &&
         resource.data.uid == request.auth.uid
@@ -107,10 +109,10 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isSignedIn() &&
         resource.data.uid == request.auth.uid &&
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'uid', 'role', 'tokenCode', 'tokenType', 'tokenExpiresAt'])) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'uid', 'role', 'tokenType', 'tokenExpiresAt'])) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokenStatus']) ||
-          request.resource.data.tokenStatus in ['redeemed', 'expired']
+          request.resource.data.tokenStatus in ['redeemed', 'used', 'expired']
         )
       );
       allow delete: if isAdmin();
