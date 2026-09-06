@@ -37,10 +37,8 @@ service cloud.firestore {
           request.resource.data.employeeRoles == resource.data.employeeRoles ||
           (
             (!('employeeRoles' in resource.data) || request.resource.data.employeeRoles.hasAll(resource.data.employeeRoles)) &&
-            (
-              !exists(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])) ||
-              get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status in ['redeemed', 'used']
-            )
+            exists(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])) &&
+            get(/databases/$(database)/documents/employee_tokens/$(uid + '_' + request.resource.data.employeeRoles[request.resource.data.employeeRoles.size() - 1])).data.status in ['pending', 'redeemed', 'used']
           )
         ) &&
         (

@@ -567,19 +567,19 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
     usedAt: serverTimestamp(),
   });
 
-  // Delete employee_tokens document to clear token from DB
+  // Add role to user profile FIRST while employee_tokens doc still exists
+  const currentRoles = Array.isArray(user.employeeRoles) ? user.employeeRoles : [];
+  if (!currentRoles.includes(appData.role)) {
+    const updatedRoles = [...currentRoles, appData.role];
+    await updateDoc(doc(db, 'users', user.uid), { employeeRoles: updatedRoles });
+  }
+
+  // Delete employee_tokens document AFTER user profile is updated
   const tokenDocId = `${user.uid}_${appData.role}`;
   try {
     await deleteDoc(doc(db, 'employee_tokens', tokenDocId));
   } catch {
     // Ignore if missing
-  }
-
-  // Add role to user profile
-  const currentRoles = Array.isArray(user.employeeRoles) ? user.employeeRoles : [];
-  if (!currentRoles.includes(appData.role)) {
-    const updatedRoles = [...currentRoles, appData.role];
-    await updateDoc(doc(db, 'users', user.uid), { employeeRoles: updatedRoles });
   }
 
   return appData.role;
