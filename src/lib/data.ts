@@ -90,17 +90,31 @@ export async function purgeUserFootprints(uid: string) {
   }
 }
 
-export async function purgeExpiredAccountFootprints() {
+export async function purgeExpiredAccountFootprints(userUid?: string) {
   try {
-    const q = query(collection(db, 'users'), where('deletionScheduled', '==', true));
-    const snap = await getDocs(q);
     const now = Date.now();
-
-    for (const userDoc of snap.docs) {
-      const data = userDoc.data() as UserProfile;
-      const dueMs = data.deletionDueDate && typeof data.deletionDueDate.toMillis === 'function' ? data.deletionDueDate.toMillis() : 0;
-      if (dueMs && dueMs <= now) {
-        await purgeUserFootprints(userDoc.id);
+    if (userUid) {
+      const userSnap = await getDoc(doc(db, 'users', userUid)).catch(() => null);
+      if (userSnap && userSnap.exists()) {
+        const data = userSnap.data() as UserProfile;
+        if (data.deletionScheduled) {
+          const dueMs = data.deletionDueDate && typeof data.deletionDueDate.toMillis === 'function' ? data.deletionDueDate.toMillis() : 0;
+          if (dueMs && dueMs <= now) {
+            await purgeUserFootprints(userUid);
+          }
+        }
+      }
+    } else {
+      const q = query(collection(db, 'users'), where('deletionScheduled', '==', true));
+      const snap = await getDocs(q).catch(() => null);
+      if (snap) {
+        for (const userDoc of snap.docs) {
+          const data = userDoc.data() as UserProfile;
+          const dueMs = data.deletionDueDate && typeof data.deletionDueDate.toMillis === 'function' ? data.deletionDueDate.toMillis() : 0;
+          if (dueMs && dueMs <= now) {
+            await purgeUserFootprints(userDoc.id);
+          }
+        }
       }
     }
   } catch {
@@ -357,43 +371,62 @@ export async function recycleTokenCode(code: string | null | undefined) {
   }
 }
 
-export async function autoCleanupExpiredTokens() {
+export async function autoCleanupExpiredTokens(userUid?: string, userEmail?: string) {
   try {
-    await purgeExpiredAccountFootprints();
+    await purgeExpiredAccountFootprints(userUid);
     const now = Date.now();
     const cutoffMs = now - 24 * 60 * 60 * 1000;
 
-    const appsSnap = await getDocs(query(collection(db, 'applications'), where('tokenStatus', '==', 'pending')));
-    for (const appDoc of appsSnap.docs) {
-      const data = appDoc.data() as Application;
-      const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
-      if (createdMs && createdMs <= cutoffMs) {
-        if (data.tokenCode) {
-          await recycleTokenCode(data.tokenCode);
+    let appsSnap = null;
+    if (userUid) {
+      const appsQuery = query(collection(db, 'applications'), where('uid', '==', userUid), where('tokenStatus', '==', 'pending'));
+      appsSnap = await getDocs(appsQuery).catch(() => null);
+    } else {
+      const appsQuery = query(collection(db, 'applications'), where('tokenStatus', '==', 'pending'));
+      appsSnap = await getDocs(appsQuery).catch(() => null);
+    }
+
+    if (appsSnap) {
+      for (const appDoc of appsSnap.docs) {
+        const data = appDoc.data() as Application;
+        const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
+        if (createdMs && createdMs <= cutoffMs) {
+          if (data.tokenCode) {
+            await recycleTokenCode(data.tokenCode);
+          }
+          await updateDoc(appDoc.ref, {
+            tokenCode: null,
+            tokenStatus: 'expired',
+          });
+          const tokenDocId = `${data.uid}_${data.role}`;
+          try {
+            await deleteDoc(doc(db, 'employee_tokens', tokenDocId));
+          } catch {}
         }
-        await updateDoc(appDoc.ref, {
-          tokenCode: null,
-          tokenStatus: 'expired',
-        });
-        const tokenDocId = `${data.uid}_${data.role}`;
-        try {
-          await deleteDoc(doc(db, 'employee_tokens', tokenDocId));
-        } catch {}
       }
     }
 
-    const adminTokensSnap = await getDocs(query(collection(db, 'admin_tokens'), where('status', '==', 'pending')));
-    for (const adminDoc of adminTokensSnap.docs) {
-      const data = adminDoc.data();
-      const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
-      if (createdMs && createdMs <= cutoffMs) {
-        if (data.token) {
-          await recycleTokenCode(data.token);
+    if (userEmail) {
+      const adminTokensQuery = query(
+        collection(db, 'admin_tokens'),
+        where('email', '==', userEmail.toLowerCase()),
+        where('status', '==', 'pending')
+      );
+      const adminTokensSnap = await getDocs(adminTokensQuery).catch(() => null);
+      if (adminTokensSnap) {
+        for (const adminDoc of adminTokensSnap.docs) {
+          const data = adminDoc.data();
+          const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
+          if (createdMs && createdMs <= cutoffMs) {
+            if (data.token) {
+              await recycleTokenCode(data.token);
+            }
+            await updateDoc(adminDoc.ref, {
+              token: null,
+              status: 'expired',
+            });
+          }
         }
-        await updateDoc(adminDoc.ref, {
-          token: null,
-          status: 'expired',
-        });
       }
     }
   } catch {
@@ -408,7 +441,7 @@ export async function generateEmployeeTokenForApplication(
   type: 'standard' | 'time_based' = 'standard',
   durationHours: number = 24
 ) {
-  await autoCleanupExpiredTokens();
+  await autoCleanupExpiredTokens(uid);
 
   const tokenCode = await getOrRecycleTokenCode('EMP', role);
 
@@ -488,7 +521,7 @@ export async function deleteEmployeeToken(applicationId: string, uid: string, ro
 }
 
 export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: UserProfile) {
-  await autoCleanupExpiredTokens();
+  await autoCleanupExpiredTokens(user.uid, user.email || undefined);
 
   const cleanCode = enteredCode.trim().toUpperCase();
   if (!cleanCode) throw new Error('Please enter your authorization token code.');
@@ -638,7 +671,7 @@ export async function createAdminToken(
   durationHours: number = 24,
   createdBy: string = 'hello.cherrylabs@gmail.com'
 ) {
-  await autoCleanupExpiredTokens();
+  await autoCleanupExpiredTokens(undefined, email);
 
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail) throw new Error('Email is required.');
@@ -697,7 +730,7 @@ export async function verifyAndRedeemAdminToken(
   enteredToken: string,
   user: UserProfile
 ) {
-  await autoCleanupExpiredTokens();
+  await autoCleanupExpiredTokens(user.uid, user.email || undefined);
 
   const cleanToken = enteredToken.trim().toUpperCase();
   if (!cleanToken) throw new Error('Please enter an access token.');
