@@ -103,35 +103,41 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
         <span className="text-xs font-black text-[var(--text-100)] uppercase tracking-wider">{app.role}</span>
       </div>
 
-      {/* TOKEN MANAGEMENT PANEL IF TOKEN EXISTS */}
-      {app.tokenCode ? (
+      {/* TOKEN MANAGEMENT PANEL IF TOKEN EXISTS OR WAS USED */}
+      {app.tokenCode || app.tokenStatus === 'used' || app.tokenStatus === 'redeemed' ? (
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <KeyRound size={14} /> Active Token Key
+              <KeyRound size={14} /> Token Key Status
             </span>
-            <span className="text-[10px] font-black text-[var(--text-60)] uppercase">
-              Status: {app.tokenStatus || 'pending'}
+            <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+              Status: {app.tokenStatus === 'redeemed' ? 'used' : (app.tokenStatus || 'pending')}
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-3 bg-[var(--surface-80)] p-3 rounded-xl border border-[var(--border-50)]">
-            <span className="font-mono text-base font-black tracking-widest text-[var(--text-100)]">
-              {app.tokenCode}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={copyToken}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 hover:bg-amber-400 transition-all"
-              >
-                {copiedToken ? <Check size={14} /> : <Copy size={14} />}
-                {copiedToken ? 'Copied' : 'Copy'}
-              </button>
+          {app.tokenCode ? (
+            <div className="flex items-center justify-between gap-3 bg-[var(--surface-80)] p-3 rounded-xl border border-[var(--border-50)]">
+              <span className="font-mono text-base font-black tracking-widest text-[var(--text-100)]">
+                {app.tokenCode}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={copyToken}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-black font-extrabold text-xs flex items-center gap-1 hover:bg-amber-400 transition-all"
+                >
+                  {copiedToken ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedToken ? 'Copied' : 'Copy'}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-[var(--surface-80)] border border-[var(--border-50)] text-xs font-bold text-[var(--text-70)]">
+              Token authorized & used (token key deleted from database).
+            </div>
+          )}
 
           <div className="flex items-center gap-2 justify-end pt-1">
-            {app.tokenStatus !== 'revoked' && (
+            {app.tokenStatus !== 'revoked' && app.tokenStatus !== 'used' && app.tokenStatus !== 'redeemed' && (
               <button
                 type="button"
                 disabled={revoking}
@@ -149,7 +155,7 @@ function ApplicationCard({ app }: { app: Application; key?: string }) {
               className="px-3 py-1.5 rounded-xl bg-gray-500/10 hover:bg-gray-500/20 text-[var(--text-70)] border border-gray-500/20 font-black text-xs flex items-center gap-1 transition-all disabled:opacity-50"
             >
               <Trash2 size={14} />
-              {deleting ? 'Deleting…' : 'Delete Key'}
+              {deleting ? 'Deleting…' : 'Delete Record'}
             </button>
           </div>
         </div>

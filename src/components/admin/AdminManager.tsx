@@ -219,8 +219,8 @@ export default function AdminManager() {
           <div className="flex flex-col gap-3">
             {tokens.map((t) => {
               const isRevoked = t.status === 'revoked';
-              const isActive = t.status === 'active';
-              const isExpired = t.status === 'expired' || (t.expiresAt && typeof t.expiresAt.toMillis === 'function' && t.expiresAt.toMillis() <= Date.now());
+              const isUsed = t.status === 'used' || t.used || t.status === 'active';
+              const isExpired = t.status === 'expired' || (!isUsed && t.expiresAt && typeof t.expiresAt.toMillis === 'function' && t.expiresAt.toMillis() <= Date.now());
 
               let statusBadgeClass = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
               let statusLabel = 'Pending Verification';
@@ -228,9 +228,9 @@ export default function AdminManager() {
               if (isRevoked) {
                 statusBadgeClass = 'bg-red-500/10 text-red-500 border-red-500/20';
                 statusLabel = 'Revoked';
-              } else if (isActive) {
+              } else if (isUsed) {
                 statusBadgeClass = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-                statusLabel = 'Active Admin';
+                statusLabel = 'used';
               } else if (isExpired) {
                 statusBadgeClass = 'bg-gray-500/10 text-gray-400 border-gray-500/20';
                 statusLabel = 'Expired';
@@ -245,11 +245,11 @@ export default function AdminManager() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-extrabold text-[var(--text-100)]">{t.email}</span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${statusBadgeClass}`}>
-                        {statusLabel}
+                        Status: {statusLabel}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-[var(--text-60)] font-bold">
-                      <span className="font-mono font-bold text-[var(--text-90)]">{t.token}</span>
+                      <span className="font-mono font-bold text-[var(--text-90)]">{t.token || 'Key deleted from DB'}</span>
                       <span>•</span>
                       <span>{t.type === 'time_based' ? `Expiring (${t.durationHours}h)` : 'Standard'}</span>
                       {t.expiresAt && typeof t.expiresAt.toMillis === 'function' && (

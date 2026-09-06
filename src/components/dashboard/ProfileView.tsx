@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Trash2, Edit2, Check, KeyRound, ShieldCheck, AlertCircle, RefreshCw, X, Award, Briefcase } from 'lucide-react';
 import { deleteUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { updateProfileFields, deleteOwnProfileDoc, verifyAndRedeemAdminToken } from '../../lib/data';
+import { updateProfileFields, scheduleAccountDeletion, verifyAndRedeemAdminToken } from '../../lib/data';
 import { useAuth } from '../../context/AuthContext';
 import type { UserProfile } from '../../types';
 
@@ -44,15 +44,8 @@ export default function ProfileView({
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deleteOwnProfileDoc(profile.uid);
-      if (auth.currentUser) {
-        try {
-          await deleteUser(auth.currentUser);
-          return;
-        } catch {
-          // Deleting the auth account can require a recent login
-        }
-      }
+      await scheduleAccountDeletion(profile.uid);
+      alert('Account deletion scheduled. The database will automatically delete all footprints for your account (including messages, access, data, and activity) in 30 days.');
       await logout();
     } finally {
       setDeleting(false);
@@ -77,7 +70,7 @@ export default function ProfileView({
     try {
       await verifyAndRedeemAdminToken(verifiedTokenCode, profile);
       setShowConfirmModal(false);
-      alert('Success! You are now an official Cherry Labs Administrator. Reloading page...');
+      alert('Token authorized! Please wait for the recruiting team to reach you for the next steps.');
       window.location.reload();
     } catch (err: any) {
       setShowConfirmModal(false);
@@ -177,6 +170,18 @@ export default function ProfileView({
           </div>
         </div>
 
+        {/* SCHEDULED DELETION NOTICE IF ACTIVE */}
+        {profile.deletionScheduled && (
+          <div className="w-full p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2 text-center">
+            <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              Account Deletion Scheduled (30-Day Window)
+            </span>
+            <p className="text-xs font-semibold text-[var(--text-80)] leading-relaxed">
+              Your account is scheduled for deletion. The database will automatically remove all footprints (including messages, access, data, and activity) after 30 days.
+            </p>
+          </div>
+        )}
+
         {/* MINIMALIST ACCESS TOKEN DOCK */}
         <div className="w-full p-5 rounded-2xl bg-[var(--surface-40)] border border-[var(--border-60)] shadow-sm flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -270,21 +275,23 @@ export default function ProfileView({
       <div className="w-full p-4 bg-[var(--surface-40)] backdrop-blur-xl border-t border-[var(--border-60)] flex gap-3 shrink-0">
         <div className="w-full max-w-2xl mx-auto flex gap-3">
           {confirmingDelete ? (
-            <div className="flex-1 flex flex-col items-center gap-2 py-3 bg-red-50 rounded-2xl border border-red-200 px-4">
-              <p className="text-xs font-bold text-red-600 text-center">Delete your account? This can't be undone.</p>
+            <div className="flex-1 flex flex-col items-center gap-2 py-3 bg-red-50 dark:bg-red-950/40 rounded-2xl border border-red-200 dark:border-red-900 px-4">
+              <p className="text-xs font-bold text-red-600 dark:text-red-400 text-center">
+                Schedule account deletion? The database will auto-delete all footprints (messages, access, data, activity) in 30 days.
+              </p>
               <div className="flex gap-2 w-full">
                 <button
                   onClick={() => setConfirmingDelete(false)}
-                  className="flex-1 py-2 rounded-xl bg-white text-[var(--text-70)] font-bold text-xs border border-[var(--border-black-10)]"
+                  className="flex-1 py-2 rounded-xl bg-white dark:bg-[var(--surface-30)] text-[var(--text-70)] font-bold text-xs border border-[var(--border-50)]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="flex-1 py-2 rounded-xl bg-red-500 text-[var(--invert-text)] font-bold text-xs disabled:opacity-60"
+                  className="flex-1 py-2 rounded-xl bg-red-500 text-white font-bold text-xs disabled:opacity-60"
                 >
-                  {deleting ? 'Deleting…' : 'Confirm delete'}
+                  {deleting ? 'Scheduling…' : 'Confirm 30-day Schedule'}
                 </button>
               </div>
             </div>
