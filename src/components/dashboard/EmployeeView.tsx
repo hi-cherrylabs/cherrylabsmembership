@@ -172,18 +172,22 @@ export default function EmployeeView({
             {tokenSuccessRole && (
               <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex flex-col gap-2">
                 <span className="flex items-center gap-2 font-black text-sm">
-                  <ShieldCheck size={18} /> Welcome to the team!
+                  <ShieldCheck size={18} /> Token Authorized & Verified
                 </span>
                 <p className="text-xs font-semibold text-[var(--text-80)] leading-relaxed">
-                  Your token for <strong className="text-[var(--text-100)]">{tokenSuccessRole}</strong> was successfully verified and redeemed. Your official employee badge and role tag have been unlocked on your Membership Details profile. Please wait until the recruitment team reaches out to you with next steps.
+                  Your token for <strong className="text-[var(--text-100)]">{tokenSuccessRole}</strong> was successfully verified and redeemed. Please wait for the recruiting team to reach you for the next steps.
                 </p>
               </div>
             )}
 
-            {latestApplication?.tokenStatus === 'redeemed' || tokenSuccessRole ? (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
-                <ShieldCheck size={18} />
-                Authorization token code verified & redeemed.
+            {latestApplication?.tokenStatus === 'redeemed' || latestApplication?.tokenStatus === 'used' || tokenSuccessRole ? (
+              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex flex-col gap-1.5">
+                <span className="font-extrabold text-sm flex items-center gap-2">
+                  <ShieldCheck size={18} /> Please Wait for the Recruiting Team
+                </span>
+                <p className="text-xs font-semibold text-[var(--text-80)] leading-relaxed">
+                  Your token has been authorized. Please wait for the recruiting team to reach you for the next steps.
+                </p>
               </div>
             ) : (
               <form onSubmit={handleRedeemToken} className="flex flex-col gap-3">

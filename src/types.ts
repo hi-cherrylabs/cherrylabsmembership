@@ -19,11 +19,14 @@ export interface UserProfile {
   employeeRoles?: string[];
   createdAt: Timestamp | null;
   vipExpiresAt: Timestamp | null;
+  deletionScheduled?: boolean;
+  deletionScheduledAt?: Timestamp | null;
+  deletionDueDate?: Timestamp | null;
 }
 
 export interface AdminToken {
   id: string;
-  token: string;
+  token?: string | null;
   email: string;
   type: 'standard' | 'time_based';
   durationHours?: number;
@@ -31,7 +34,7 @@ export interface AdminToken {
   used: boolean;
   usedByUid: string | null;
   usedAt: Timestamp | null;
-  status: 'pending' | 'active' | 'expired' | 'revoked';
+  status: 'pending' | 'active' | 'expired' | 'revoked' | 'used';
   createdBy: string;
   createdAt: Timestamp | null;
 }
@@ -42,7 +45,7 @@ export interface EmployeeToken {
   applicationId: string;
   uid: string;
   role: string;
-  status: 'pending' | 'redeemed' | 'revoked';
+  status: 'pending' | 'redeemed' | 'revoked' | 'used';
   usedAt: Timestamp | null;
   createdAt: Timestamp | null;
 }
@@ -88,7 +91,7 @@ export interface Application {
   tokenType?: 'standard' | 'time_based';
   tokenDurationHours?: number | null;
   tokenExpiresAt?: Timestamp | null;
-  tokenStatus?: 'pending' | 'redeemed' | 'revoked' | 'expired';
+  tokenStatus?: 'pending' | 'redeemed' | 'revoked' | 'expired' | 'used';
   createdAt: Timestamp | null;
 }
 

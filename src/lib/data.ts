@@ -41,8 +41,75 @@ export async function updateProfileFields(uid: string, fields: Partial<UserProfi
   await updateDoc(doc(db, 'users', uid), fields as Record<string, unknown>);
 }
 
+export async function scheduleAccountDeletion(uid: string) {
+  const dueDate = Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await updateDoc(doc(db, 'users', uid), {
+    deletionScheduled: true,
+    deletionScheduledAt: serverTimestamp(),
+    deletionDueDate: dueDate,
+  });
+  return dueDate;
+}
+
+export async function purgeUserFootprints(uid: string) {
+  try {
+    // 1. Delete community messages
+    const cmQuery = query(collection(db, 'community_messages'), where('uid', '==', uid));
+    const cmSnap = await getDocs(cmQuery);
+    for (const d of cmSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+
+    // 2. Delete suggestion thread & subcollection messages
+    try {
+      const msgsSnap = await getDocs(collection(db, 'suggestions', uid, 'messages'));
+      for (const d of msgsSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+      await deleteDoc(doc(db, 'suggestions', uid));
+    } catch {}
+
+    // 3. Delete applications
+    const appsQuery = query(collection(db, 'applications'), where('uid', '==', uid));
+    const appsSnap = await getDocs(appsQuery);
+    for (const d of appsSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+
+    // 4. Delete employee tokens
+    const empQuery = query(collection(db, 'employee_tokens'), where('uid', '==', uid));
+    const empSnap = await getDocs(empQuery);
+    for (const d of empSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+
+    // 5. Delete user profile doc
+    await deleteDoc(doc(db, 'users', uid));
+  } catch {
+    // Catch-all
+  }
+}
+
+export async function purgeExpiredAccountFootprints() {
+  try {
+    const q = query(collection(db, 'users'), where('deletionScheduled', '==', true));
+    const snap = await getDocs(q);
+    const now = Date.now();
+
+    for (const userDoc of snap.docs) {
+      const data = userDoc.data() as UserProfile;
+      const dueMs = data.deletionDueDate && typeof data.deletionDueDate.toMillis === 'function' ? data.deletionDueDate.toMillis() : 0;
+      if (dueMs && dueMs <= now) {
+        await purgeUserFootprints(userDoc.id);
+      }
+    }
+  } catch {
+    // Catch-all
+  }
+}
+
 export async function deleteOwnProfileDoc(uid: string) {
-  await deleteDoc(doc(db, 'users', uid));
+  await scheduleAccountDeletion(uid);
 }
 
 /* --------------------------- Community Chat ------------------------------ */
@@ -205,6 +272,135 @@ export async function updateApplicationStatus(id: string, status: ApplicationSta
   await updateDoc(doc(db, 'applications', id), { status });
 }
 
+/* ------------------------ Token Recycling & Cleanup ----------------------- */
+
+export async function getOrRecycleTokenCode(prefix: string, role?: string): Promise<string> {
+  const poolRef = doc(db, 'settings', 'token_pool');
+  let poolSnap;
+  try {
+    poolSnap = await getDoc(poolRef);
+  } catch {
+    // Fallback if settings doc read fails
+  }
+
+  let totalCount = 0;
+  let recycledList: Array<{ code: string; recycledAtSequence: number; recycledAt: number }> = [];
+
+  if (poolSnap && poolSnap.exists()) {
+    const pData = poolSnap.data();
+    totalCount = pData.totalGeneratedCount || 0;
+    recycledList = Array.isArray(pData.recycledPool) ? pData.recycledPool : [];
+  }
+
+  const nextSequence = totalCount + 1;
+  let reusedCode: string | null = null;
+
+  // Find eligible recycled token where nextSequence - recycledAtSequence >= 100
+  const eligibleIdx = recycledList.findIndex((item) => nextSequence - item.recycledAtSequence >= 100);
+
+  if (eligibleIdx !== -1) {
+    reusedCode = recycledList[eligibleIdx].code;
+    recycledList.splice(eligibleIdx, 1);
+  }
+
+  try {
+    await setDoc(
+      poolRef,
+      {
+        totalGeneratedCount: nextSequence,
+        recycledPool: recycledList,
+      },
+      { merge: true }
+    );
+  } catch {
+    // Ignore error
+  }
+
+  if (reusedCode) {
+    return reusedCode;
+  }
+
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+
+  if (prefix === 'EMP') {
+    const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
+    return `EMP-${rolePrefix}-${rand}`;
+  } else {
+    return `ADM-${rand.slice(0, 3)}-${rand.slice(3)}`;
+  }
+}
+
+export async function recycleTokenCode(code: string | null | undefined) {
+  if (!code) return;
+  const poolRef = doc(db, 'settings', 'token_pool');
+  try {
+    const poolSnap = await getDoc(poolRef);
+    let totalCount = 0;
+    let recycledList: Array<{ code: string; recycledAtSequence: number; recycledAt: number }> = [];
+    if (poolSnap.exists()) {
+      const pData = poolSnap.data();
+      totalCount = pData.totalGeneratedCount || 0;
+      recycledList = Array.isArray(pData.recycledPool) ? pData.recycledPool : [];
+    }
+    if (!recycledList.some((item) => item.code === code)) {
+      recycledList.push({
+        code,
+        recycledAtSequence: totalCount,
+        recycledAt: Date.now(),
+      });
+      await setDoc(poolRef, { totalGeneratedCount: totalCount, recycledPool: recycledList }, { merge: true });
+    }
+  } catch {
+    // Ignore error
+  }
+}
+
+export async function autoCleanupExpiredTokens() {
+  try {
+    await purgeExpiredAccountFootprints();
+    const now = Date.now();
+    const cutoffMs = now - 24 * 60 * 60 * 1000;
+
+    const appsSnap = await getDocs(query(collection(db, 'applications'), where('tokenStatus', '==', 'pending')));
+    for (const appDoc of appsSnap.docs) {
+      const data = appDoc.data() as Application;
+      const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
+      if (createdMs && createdMs <= cutoffMs) {
+        if (data.tokenCode) {
+          await recycleTokenCode(data.tokenCode);
+        }
+        await updateDoc(appDoc.ref, {
+          tokenCode: null,
+          tokenStatus: 'expired',
+        });
+        const tokenDocId = `${data.uid}_${data.role}`;
+        try {
+          await deleteDoc(doc(db, 'employee_tokens', tokenDocId));
+        } catch {}
+      }
+    }
+
+    const adminTokensSnap = await getDocs(query(collection(db, 'admin_tokens'), where('status', '==', 'pending')));
+    for (const adminDoc of adminTokensSnap.docs) {
+      const data = adminDoc.data();
+      const createdMs = data.createdAt && typeof data.createdAt.toMillis === 'function' ? data.createdAt.toMillis() : 0;
+      if (createdMs && createdMs <= cutoffMs) {
+        if (data.token) {
+          await recycleTokenCode(data.token);
+        }
+        await updateDoc(adminDoc.ref, {
+          token: null,
+          status: 'expired',
+        });
+      }
+    }
+  } catch {
+    // Catch-all
+  }
+}
+
 export async function generateEmployeeTokenForApplication(
   applicationId: string,
   uid: string,
@@ -212,13 +408,11 @@ export async function generateEmployeeTokenForApplication(
   type: 'standard' | 'time_based' = 'standard',
   durationHours: number = 24
 ) {
-  const rolePrefix = (role || 'EMP').slice(0, 3).toUpperCase();
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let rand = '';
-  for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
-  const tokenCode = `EMP-${rolePrefix}-${rand}`;
+  await autoCleanupExpiredTokens();
 
-  let expiresAt: Timestamp | null = null;
+  const tokenCode = await getOrRecycleTokenCode('EMP', role);
+
+  let expiresAt: Timestamp | null = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
   if (type === 'time_based') {
     expiresAt = Timestamp.fromMillis(Date.now() + durationHours * 60 * 60 * 1000);
   }
@@ -294,6 +488,8 @@ export async function deleteEmployeeToken(applicationId: string, uid: string, ro
 }
 
 export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: UserProfile) {
+  await autoCleanupExpiredTokens();
+
   const cleanCode = enteredCode.trim().toUpperCase();
   if (!cleanCode) throw new Error('Please enter your authorization token code.');
 
@@ -303,7 +499,6 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
   const matchAppDoc = appsSnap.docs.find((d) => {
     const data = d.data() as Application;
     return (
-      data.status === 'accepted' &&
       (data.tokenCode || '').trim().toUpperCase() === cleanCode
     );
   });
@@ -314,26 +509,38 @@ export async function verifyAndRedeemEmployeeToken(enteredCode: string, user: Us
 
   const appData = matchAppDoc.data() as Application;
 
-  if (appData.tokenStatus === 'redeemed') {
+  if (appData.tokenStatus === 'used' || appData.tokenStatus === 'redeemed') {
     throw new Error('This token has already been redeemed for access.');
   }
 
-  // Check time-based token expiration
-  if (appData.tokenType === 'time_based' && appData.tokenExpiresAt) {
-    const expMs = typeof appData.tokenExpiresAt.toMillis === 'function' ? appData.tokenExpiresAt.toMillis() : 0;
-    if (expMs && expMs <= Date.now()) {
-      await updateDoc(matchAppDoc.ref, { tokenStatus: 'expired' });
-      throw new Error('This access token has expired.');
-    }
+  if (appData.tokenStatus === 'expired') {
+    throw new Error('This access token has expired.');
   }
 
-  // Mark application token redeemed
-  await updateDoc(matchAppDoc.ref, { tokenStatus: 'redeemed' });
+  // Check 24-hour expiration or explicit expiresAt
+  const createdMs = appData.createdAt && typeof appData.createdAt.toMillis === 'function' ? appData.createdAt.toMillis() : 0;
+  if (createdMs && Date.now() - createdMs > 24 * 60 * 60 * 1000) {
+    await recycleTokenCode(cleanCode);
+    await updateDoc(matchAppDoc.ref, { tokenCode: null, tokenStatus: 'expired' });
+    throw new Error('This access token has expired.');
+  }
 
-  // Update employee_tokens
+  // Recycle token code and mark token as used (delete tokenCode from DB)
+  await recycleTokenCode(cleanCode);
+
+  await updateDoc(matchAppDoc.ref, {
+    tokenStatus: 'used',
+    tokenCode: null,
+    usedAt: serverTimestamp(),
+  });
+
+  // Delete employee_tokens document to clear token from DB
   const tokenDocId = `${user.uid}_${appData.role}`;
-  const empTokenRef = doc(db, 'employee_tokens', tokenDocId);
-  await setDoc(empTokenRef, { status: 'redeemed', usedAt: serverTimestamp() }, { merge: true });
+  try {
+    await deleteDoc(doc(db, 'employee_tokens', tokenDocId));
+  } catch {
+    // Ignore if missing
+  }
 
   // Add role to user profile
   const currentRoles = Array.isArray(user.employeeRoles) ? user.employeeRoles : [];
@@ -431,14 +638,16 @@ export async function createAdminToken(
   durationHours: number = 24,
   createdBy: string = 'hello.cherrylabs@gmail.com'
 ) {
+  await autoCleanupExpiredTokens();
+
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail) throw new Error('Email is required.');
 
-  const tokenCode = generateTokenCode();
+  const tokenCode = await getOrRecycleTokenCode('ADM');
   const tokenDocRef = doc(collection(db, 'admin_tokens'));
   const nowMs = Date.now();
 
-  let expiresAt: Timestamp | null = null;
+  let expiresAt: Timestamp | null = Timestamp.fromMillis(nowMs + 24 * 60 * 60 * 1000);
   if (type === 'time_based') {
     expiresAt = Timestamp.fromMillis(nowMs + durationHours * 60 * 60 * 1000);
   }
@@ -488,6 +697,8 @@ export async function verifyAndRedeemAdminToken(
   enteredToken: string,
   user: UserProfile
 ) {
+  await autoCleanupExpiredTokens();
+
   const cleanToken = enteredToken.trim().toUpperCase();
   if (!cleanToken) throw new Error('Please enter an access token.');
   if (!user.email) throw new Error('Your account must have a valid email to redeem an admin token.');
@@ -507,7 +718,7 @@ export async function verifyAndRedeemAdminToken(
 
   const tokenData = matchingDoc.data();
 
-  if (tokenData.used || tokenData.status === 'active') {
+  if (tokenData.used || tokenData.status === 'used' || tokenData.status === 'active') {
     throw new Error('This access token has already been redeemed.');
   }
 
@@ -515,24 +726,31 @@ export async function verifyAndRedeemAdminToken(
     throw new Error('This access token has been revoked by the Super Admin.');
   }
 
+  if (tokenData.status === 'expired') {
+    throw new Error('This access token has expired.');
+  }
+
   if ((tokenData.email || '').toLowerCase() !== cleanUserEmail) {
     throw new Error('This access token is not authorized for your account.');
   }
 
-  if (tokenData.type === 'time_based' && tokenData.expiresAt) {
-    const expMs = typeof tokenData.expiresAt.toMillis === 'function' ? tokenData.expiresAt.toMillis() : 0;
-    if (expMs && expMs <= Date.now()) {
-      await updateDoc(matchingDoc.ref, { status: 'expired' });
-      throw new Error('This access token has expired.');
-    }
+  // Check 24h expiration
+  const createdMs = tokenData.createdAt && typeof tokenData.createdAt.toMillis === 'function' ? tokenData.createdAt.toMillis() : 0;
+  if (createdMs && Date.now() - createdMs > 24 * 60 * 60 * 1000) {
+    await recycleTokenCode(cleanToken);
+    await updateDoc(matchingDoc.ref, { token: null, status: 'expired' });
+    throw new Error('This access token has expired.');
   }
 
-  // Redeem token
+  // Recycle token code and mark as used (delete token secret string from DB)
+  await recycleTokenCode(cleanToken);
+
   await updateDoc(matchingDoc.ref, {
+    token: null,
     used: true,
     usedByUid: user.uid,
     usedAt: serverTimestamp(),
-    status: 'active',
+    status: 'used',
   });
 
   // Upgrade user profile
